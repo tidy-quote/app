@@ -1,17 +1,7 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AuthState, AuthUser } from "../../domain/types";
+import { useState, useCallback, type ReactNode } from "react";
+import type { AuthState } from "../../domain/types";
 import * as authService from "../../application/auth";
-
-interface AuthContextValue {
-  user: AuthUser | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext } from "./AuthContext";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -35,22 +25,18 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     setAuthState({ user: null, token: null });
   }, []);
 
-  const value: AuthContextValue = {
-    user: authState.user,
-    token: authState.token,
-    isAuthenticated: authState.user !== null && authState.token !== null,
-    login,
-    signup,
-    logout,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  return (
+    <AuthContext.Provider
+      value={{
+        user: authState.user,
+        token: authState.token,
+        isAuthenticated: authState.user !== null && authState.token !== null,
+        login,
+        signup,
+        logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }

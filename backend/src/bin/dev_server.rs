@@ -39,8 +39,7 @@ fn extract_user_id(req: &HttpRequest) -> Result<UserId, HttpResponse> {
     })?;
 
     let claims = validate_token(token).map_err(|_| {
-        HttpResponse::Unauthorized()
-            .json(serde_json::json!({"error": "invalid or expired token"}))
+        HttpResponse::Unauthorized().json(serde_json::json!({"error": "invalid or expired token"}))
     })?;
 
     Ok(UserId::new(claims.sub))
@@ -66,8 +65,7 @@ async fn signup(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
             },
         }),
         Err(quotesnap_backend::application::use_cases::auth::AuthError::EmailTaken) => {
-            HttpResponse::Conflict()
-                .json(serde_json::json!({"error": "email already registered"}))
+            HttpResponse::Conflict().json(serde_json::json!({"error": "email already registered"}))
         }
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
@@ -95,8 +93,7 @@ async fn login(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
             },
         }),
         Err(quotesnap_backend::application::use_cases::auth::AuthError::InvalidCredentials) => {
-            HttpResponse::Unauthorized()
-                .json(serde_json::json!({"error": "invalid credentials"}))
+            HttpResponse::Unauthorized().json(serde_json::json!({"error": "invalid credentials"}))
         }
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
@@ -104,11 +101,7 @@ async fn login(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
     }
 }
 
-async fn save_pricing(
-    req: HttpRequest,
-    state: Data<Arc<AppState>>,
-    body: Bytes,
-) -> HttpResponse {
+async fn save_pricing(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
     let user_id = match extract_user_id(&req) {
         Ok(id) => id,
         Err(r) => return r,
@@ -143,10 +136,7 @@ async fn save_pricing(
     }
 }
 
-async fn get_pricing(
-    req: HttpRequest,
-    state: Data<Arc<AppState>>,
-) -> HttpResponse {
+async fn get_pricing(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
     let user_id = match extract_user_id(&req) {
         Ok(id) => id,
         Err(r) => return r,
@@ -164,11 +154,7 @@ async fn get_pricing(
     }
 }
 
-async fn submit_lead(
-    req: HttpRequest,
-    state: Data<Arc<AppState>>,
-    body: Bytes,
-) -> HttpResponse {
+async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
     let user_id = match extract_user_id(&req) {
         Ok(id) => id,
         Err(r) => return r,

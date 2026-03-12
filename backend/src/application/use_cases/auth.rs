@@ -58,8 +58,8 @@ impl<'a> AuthUseCase<'a> {
         validate_email(email)?;
         validate_password(password)?;
 
-        let password_hash = bcrypt::hash(password, BCRYPT_COST)
-            .map_err(|e| AuthError::HashError(e.to_string()))?;
+        let password_hash =
+            bcrypt::hash(password, BCRYPT_COST).map_err(|e| AuthError::HashError(e.to_string()))?;
 
         let user = User {
             id: UserId::generate(),
@@ -92,8 +92,7 @@ impl<'a> AuthUseCase<'a> {
             .await?
             .ok_or(AuthError::InvalidCredentials)?;
 
-        let valid =
-            bcrypt::verify(password, &user.password_hash).unwrap_or(false);
+        let valid = bcrypt::verify(password, &user.password_hash).unwrap_or(false);
 
         if !valid {
             return Err(AuthError::InvalidCredentials);
@@ -188,13 +187,19 @@ mod tests {
     #[test]
     fn rejects_invalid_email() {
         assert!(matches!(validate_email(""), Err(AuthError::InvalidEmail)));
-        assert!(matches!(validate_email("no-at-sign"), Err(AuthError::InvalidEmail)));
+        assert!(matches!(
+            validate_email("no-at-sign"),
+            Err(AuthError::InvalidEmail)
+        ));
         assert!(validate_email("test@example.com").is_ok());
     }
 
     #[test]
     fn rejects_invalid_password() {
-        assert!(matches!(validate_password("short"), Err(AuthError::InvalidPassword)));
+        assert!(matches!(
+            validate_password("short"),
+            Err(AuthError::InvalidPassword)
+        ));
         assert!(matches!(
             validate_password(&"x".repeat(73)),
             Err(AuthError::InvalidPassword)

@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "./useAuth";
 
 export function ProtectedRoute(): React.JSX.Element {
   const { isAuthenticated } = useAuth();

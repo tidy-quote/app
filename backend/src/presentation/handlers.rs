@@ -91,8 +91,8 @@ pub fn extract_user_id(req: &Request) -> Result<UserId, Response<Body>> {
         .strip_prefix("Bearer ")
         .ok_or_else(|| error_response(401, "invalid Authorization header format"))?;
 
-    let claims = validate_token(token)
-        .map_err(|_| error_response(401, "invalid or expired token"))?;
+    let claims =
+        validate_token(token).map_err(|_| error_response(401, "invalid or expired token"))?;
 
     Ok(UserId::new(claims.sub))
 }
@@ -123,7 +123,9 @@ pub async fn handle_signup(req: Request, user_store: &dyn UserStore) -> Response
         ),
         Err(AuthError::EmailTaken) => error_response(409, "email already registered"),
         Err(AuthError::InvalidEmail) => error_response(400, "invalid email format"),
-        Err(AuthError::InvalidPassword) => error_response(400, "password must be between 8 and 72 characters"),
+        Err(AuthError::InvalidPassword) => {
+            error_response(400, "password must be between 8 and 72 characters")
+        }
         Err(e) => {
             eprintln!("signup error: {e}");
             error_response(500, "an internal error occurred")

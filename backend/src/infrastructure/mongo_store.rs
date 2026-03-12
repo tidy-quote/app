@@ -89,16 +89,13 @@ impl PricingStore for MongoStore {
 #[async_trait]
 impl UserStore for MongoStore {
     async fn create_user(&self, user: &User) -> Result<(), StoreError> {
-        self.users_collection
-            .insert_one(user)
-            .await
-            .map_err(|e| {
-                if e.to_string().contains("E11000") {
-                    StoreError::DuplicateEmail(user.email.clone())
-                } else {
-                    StoreError::Internal(e.to_string())
-                }
-            })?;
+        self.users_collection.insert_one(user).await.map_err(|e| {
+            if e.to_string().contains("E11000") {
+                StoreError::DuplicateEmail(user.email.clone())
+            } else {
+                StoreError::Internal(e.to_string())
+            }
+        })?;
 
         Ok(())
     }

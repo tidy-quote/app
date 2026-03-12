@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useAuth } from "../components/AuthProvider";
+import { useAuth } from "../components/useAuth";
 import "./AppLayout.css";
 
 export function AppLayout(): React.JSX.Element {
