@@ -194,59 +194,14 @@ jobs:
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           echo "Lambda deployed successfully"
 
-      - name: Debug Lambda URL auth
+      - name: Cleanup old Lambda function URL
         run: |
           FUNCTION_NAME=$(aws cloudformation describe-stacks \
             --stack-name ${{ env.BACKEND_STACK_NAME }} \
             --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
             --output text)
 
-          API_URL=$(aws cloudformation describe-stacks \
-            --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
-            --output text)
-
-          echo "=== Delete existing URL ==="
-          aws lambda delete-function-url-config --function-name "$FUNCTION_NAME" || true
-
-          echo "=== Remove all permissions ==="
-          POLICY=$(aws lambda get-policy --function-name "$FUNCTION_NAME" --output json 2>/dev/null || echo "{}")
-          echo "$POLICY" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          if 'Policy' in data:
-              policy = json.loads(data['Policy'])
-              for stmt in policy.get('Statement', []):
-                  print(stmt['Sid'])
-          " | while read SID; do
-            echo "Removing: $SID"
-            aws lambda remove-permission --function-name "$FUNCTION_NAME" --statement-id "$SID" || true
-          done
-
-          echo "=== Create fresh URL via CLI ==="
-          aws lambda create-function-url-config \
-            --function-name "$FUNCTION_NAME" \
-            --auth-type NONE \
-            --cors '{"AllowOrigins":["*"],"AllowMethods":["*"],"AllowHeaders":["*"],"MaxAge":3600}'
-
-          echo "=== Add fresh permission ==="
-          aws lambda add-permission \
-            --function-name "$FUNCTION_NAME" \
-            --statement-id "FunctionURLAllowPublicAccess" \
-            --action "lambda:InvokeFunctionUrl" \
-            --principal "*" \
-            --function-url-auth-type "NONE"
-
-          echo "=== New URL config ==="
-          NEW_URL=$(aws lambda get-function-url-config --function-name "$FUNCTION_NAME" --query 'FunctionUrl' --output text)
-          echo "URL: $NEW_URL"
-
-          echo "=== New policy ==="
-          aws lambda get-policy --function-name "$FUNCTION_NAME"
-
-          echo "=== Test new URL ==="
-          sleep 5
-          curl -s -w "\nHTTP: %{http_code}\n" "$NEW_URL"
+          aws lambda delete-function-url-config --function-name "$FUNCTION_NAME" 2>/dev/null || true
 
   deploy-frontend:
     name: Deploy Frontend Site
