@@ -11,6 +11,7 @@ use crate::domain::value_objects::*;
 const APPLICATION_JSON: &str = "application/json";
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SavePricingRequest {
     pub currency: String,
     pub country: String,

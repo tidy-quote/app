@@ -14,6 +14,7 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ServiceCategory {
     pub id: String,
     pub name: String,
@@ -29,6 +30,7 @@ pub struct AddOn {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PricingTemplate {
     pub id: TemplateId,
     pub user_id: UserId,
@@ -51,6 +53,7 @@ pub enum ToneOption {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Lead {
     pub id: LeadId,
     pub user_id: UserId,
@@ -60,6 +63,7 @@ pub struct Lead {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JobSummary {
     pub service_type: String,
     pub property_size: Option<String>,
@@ -76,6 +80,7 @@ pub struct PriceLineItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QuoteDraft {
     pub id: QuoteId,
     pub lead_id: LeadId,
