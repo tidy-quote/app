@@ -134,6 +134,22 @@ jobs:
               BasicAuthPassword="${{ secrets.BASIC_AUTH_PASSWORD }}" \
             --no-fail-on-empty-changeset
 
+      - name: Clean up stuck backend stack
+        run: |
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+
+          if [ "$STACK_STATUS" = "REVIEW_IN_PROGRESS" ] || [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "Stack in $STACK_STATUS state, deleting..."
+            aws cloudformation delete-stack --stack-name ${{ env.BACKEND_STACK_NAME }}
+            aws cloudformation wait stack-delete-complete --stack-name ${{ env.BACKEND_STACK_NAME }}
+            echo "Stuck stack deleted"
+          else
+            echo "Stack status: $STACK_STATUS (no cleanup needed)"
+          fi
+
       - name: Deploy backend infrastructure
         run: |
           aws cloudformation deploy \
