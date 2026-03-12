@@ -341,13 +341,13 @@
       line-height: 1.55;
     }
 
-    /* Waitlist */
-    .waitlist-section {
+    /* CTA */
+    .cta-section {
       text-align: center;
       background: linear-gradient(180deg, var(--bg) 0%, #e4f5f4 100%);
     }
 
-    .waitlist-card {
+    .cta-card {
       max-width: 28rem;
       margin: 0 auto;
       background: var(--surface);
@@ -357,63 +357,25 @@
       box-shadow: 0 8px 30px rgba(28, 63, 68, 0.08);
     }
 
-    .waitlist-form {
-      display: flex;
-      gap: 0.5rem;
+    .cta-btn {
+      display: inline-block;
       margin-top: 1.5rem;
-    }
-
-    .waitlist-input {
-      flex: 1;
-      padding: 0.75rem 1rem;
-      border: 1px solid #cddde1;
-      border-radius: 0.5rem;
-      font-family: inherit;
-      font-size: 0.9rem;
-      transition: all 0.2s;
-    }
-    .waitlist-input:focus {
-      outline: none;
-      border-color: var(--petrolio);
-      box-shadow: 0 0 0 3px rgba(26, 115, 112, 0.18);
-    }
-
-    .waitlist-btn {
-      padding: 0.75rem 1.5rem;
+      padding: 0.875rem 2rem;
       background: linear-gradient(135deg, var(--petrolio), var(--green));
       color: #fff;
-      font-size: 0.9rem;
-      font-weight: 600;
-      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
       border: none;
-      border-radius: 0.5rem;
+      border-radius: 9999px;
+      text-decoration: none;
       cursor: pointer;
       transition: all 0.2s;
-      white-space: nowrap;
     }
-    .waitlist-btn:hover {
-      box-shadow: 0 4px 18px rgba(26, 115, 112, 0.3);
-      transform: translateY(-1px);
+    .cta-btn:hover {
+      box-shadow: 0 6px 20px rgba(26, 115, 112, 0.3);
+      transform: translateY(-2px);
     }
-    .waitlist-btn:active { transform: translateY(0) scale(0.97); }
-
-    .waitlist-note {
-      margin-top: 0.75rem;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .waitlist-success {
-      display: none;
-      padding: 1rem;
-      background: #ddf3ea;
-      border: 1px solid var(--green);
-      border-radius: 0.5rem;
-      color: #1a5c38;
-      font-weight: 500;
-      font-size: 0.9rem;
-      margin-top: 1.5rem;
-    }
+    .cta-btn:active { transform: translateY(0) scale(0.97); }
 
     /* Footer */
     .footer {
@@ -432,9 +394,6 @@
 
     /* Responsive */
     @media (max-width: 640px) {
-      .waitlist-form {
-        flex-direction: column;
-      }
       .nav { padding: 0.75rem 1rem; }
     }
   </style>
@@ -443,7 +402,7 @@
 
   <nav class="nav">
     <a href="#" class="nav-logo"><img src="logo.svg" alt="Tidy-Quote" class="nav-logo-img">Tidy-Quote</a>
-    <a href="#waitlist" class="nav-cta">Join Waitlist</a>
+    <a href="https://tidyquote.app/signup" class="nav-cta">Get Started</a>
   </nav>
 
   <section class="hero">
@@ -454,7 +413,7 @@
         Paste a message, upload a photo &mdash; Tidy-Quote extracts the job details,
         calculates the price using your rates, and drafts a follow-up message ready to send.
       </p>
-      <a href="#waitlist" class="hero-cta fade-in fade-in-4">Get Early Access</a>
+      <a href="https://tidyquote.app/signup" class="hero-cta fade-in fade-in-4">Get Started Free</a>
     </div>
   </section>
 
@@ -526,25 +485,12 @@
     </div>
   </section>
 
-  <section class="section waitlist-section" id="waitlist">
-    <div class="waitlist-card fade-in">
-      <span class="section-label">Early Access</span>
-      <h2 class="section-title">Be the first to try Tidy-Quote</h2>
-      <p class="section-desc">Join the waitlist and we&rsquo;ll let you know when it&rsquo;s ready.</p>
-      <form class="waitlist-form" id="waitlist-form">
-        <input
-          type="email"
-          class="waitlist-input"
-          placeholder="you@example.com"
-          required
-          aria-label="Email address"
-        >
-        <button type="submit" class="waitlist-btn">Join Waitlist</button>
-      </form>
-      <p class="waitlist-note">No spam, ever. Unsubscribe anytime.</p>
-      <div class="waitlist-success" id="waitlist-success">
-        You&rsquo;re on the list! We&rsquo;ll be in touch soon.
-      </div>
+  <section class="section cta-section" id="get-started">
+    <div class="cta-card fade-in">
+      <span class="section-label">Free to Use</span>
+      <h2 class="section-title">Start quoting in seconds</h2>
+      <p class="section-desc">Create your account, set up your pricing, and send your first quote today.</p>
+      <a href="https://tidyquote.app/signup" class="cta-btn">Get Started Free</a>
     </div>
   </section>
 
@@ -571,15 +517,6 @@
       observer.observe(el);
     });
 
-    // Waitlist form (client-side only for now)
-    document.getElementById('waitlist-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const form = e.target;
-      const success = document.getElementById('waitlist-success');
-      form.style.display = 'none';
-      form.nextElementSibling.style.display = 'none';
-      success.style.display = 'block';
-    });
   </script>
 </body>
 </html>
