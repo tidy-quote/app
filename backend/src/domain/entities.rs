@@ -1,0 +1,82 @@
+use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+use super::value_objects::*;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceCategory {
+    pub id: String,
+    pub name: String,
+    pub base_price: f64,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddOn {
+    pub id: String,
+    pub name: String,
+    pub price: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PricingTemplate {
+    pub id: TemplateId,
+    pub user_id: UserId,
+    pub currency: String,
+    pub country: String,
+    pub minimum_callout: f64,
+    pub categories: Vec<ServiceCategory>,
+    pub add_ons: Vec<AddOn>,
+    pub custom_notes: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ToneOption {
+    Friendly,
+    Direct,
+    Premium,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Lead {
+    pub id: LeadId,
+    pub user_id: UserId,
+    pub raw_text: Option<String>,
+    pub image_data: Vec<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobSummary {
+    pub service_type: String,
+    pub property_size: Option<String>,
+    pub requested_date: Option<String>,
+    pub requested_time: Option<String>,
+    pub missing_info: Vec<String>,
+    pub extracted_details: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PriceLineItem {
+    pub description: String,
+    pub amount: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuoteDraft {
+    pub id: QuoteId,
+    pub lead_id: LeadId,
+    pub job_summary: JobSummary,
+    pub estimated_price: f64,
+    pub price_breakdown: Vec<PriceLineItem>,
+    pub assumptions: Vec<String>,
+    pub follow_up_message: String,
+    pub clarification_message: Option<String>,
+    pub tone: ToneOption,
+    pub created_at: DateTime<Utc>,
+}

@@ -1,0 +1,19 @@
+[package]
+name = "quotesnap-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+mongodb = "3"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+lambda_http = "0.13"
+lambda_runtime = "0.13"
+base64 = "0.22"
+async-trait = "0.1"
