@@ -60,6 +60,20 @@ struct ChatResponseMessage {
 
 const TEMPERATURE: f64 = 0.3;
 
+fn extract_json(text: &str) -> &str {
+    let trimmed = text.trim();
+    if let Some(start) = trimmed.find("```") {
+        let after_backticks = &trimmed[start + 3..];
+        let content = after_backticks
+            .strip_prefix("json")
+            .unwrap_or(after_backticks);
+        if let Some(end) = content.find("```") {
+            return content[..end].trim();
+        }
+    }
+    trimmed
+}
+
 impl OpenAiCompatibleClient {
     pub fn new(config: AiClientConfig) -> Self {
         Self {
@@ -175,8 +189,9 @@ Respond with valid JSON matching this schema:
         ];
 
         let response_text = self.chat_completion(messages).await?;
+        let json_text = extract_json(&response_text);
 
-        serde_json::from_str(&response_text)
+        serde_json::from_str(json_text)
             .map_err(|e| AiError::ParseError(format!("failed to parse job summary: {}", e)))
     }
 
