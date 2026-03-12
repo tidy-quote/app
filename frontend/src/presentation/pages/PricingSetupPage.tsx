@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
-import type { ServiceCategory, AddOn } from "../../domain/types";
+import { useState, useEffect, type FormEvent } from "react";
+import type { ServiceCategory, AddOn, PricingTemplate } from "../../domain/types";
+import { getPricingTemplate, savePricingTemplate } from "../../application/api";
 import "./PricingSetupPage.css";
 
 const EMPTY_CATEGORY: ServiceCategory = {
@@ -26,6 +27,27 @@ export function PricingSetupPage(): React.JSX.Element {
     { ...EMPTY_ADDON, id: "1" },
   ]);
   const [customNotes, setCustomNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    getPricingTemplate()
+      .then((template) => {
+        if (template) {
+          setCurrency(template.currency);
+          setCountry(template.country);
+          setMinimumCallout(template.minimumCallout);
+          if (template.categories.length > 0) setCategories(template.categories);
+          if (template.addOns.length > 0) setAddOns(template.addOns);
+          setCustomNotes(template.customNotes);
+        }
+      })
+      .catch(() => {
+        // No saved template, use defaults
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   function updateCategory(
     index: number,
@@ -66,17 +88,39 @@ export function PricingSetupPage(): React.JSX.Element {
     setAddOns((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function handleSubmit(e: FormEvent): void {
+  async function handleSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
-    // TODO: wire up to API
-    console.log("Saving pricing template:", {
+    setSaving(true);
+    setSuccessMessage("");
+
+    const template: PricingTemplate = {
+      id: "",
+      userId: "",
       currency,
       country,
       minimumCallout,
       categories,
       addOns,
       customNotes,
-    });
+    };
+
+    try {
+      await savePricingTemplate(template);
+      setSuccessMessage("Pricing template saved successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch {
+      setSuccessMessage("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="pricing-setup">
+        <p className="loading-text">Loading pricing template...</p>
+      </div>
+    );
   }
 
   return (
@@ -85,6 +129,12 @@ export function PricingSetupPage(): React.JSX.Element {
       <p className="page-desc">
         Configure your service categories, add-ons, and default rates.
       </p>
+
+      {successMessage && (
+        <div className="success-banner" role="status">
+          {successMessage}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="pricing-form">
         <fieldset className="form-section">
@@ -219,8 +269,8 @@ export function PricingSetupPage(): React.JSX.Element {
           />
         </fieldset>
 
-        <button type="submit" className="btn-primary">
-          Save Pricing Template
+        <button type="submit" className="btn-primary" disabled={saving}>
+          {saving ? "Saving..." : "Save Pricing Template"}
         </button>
       </form>
     </div>
