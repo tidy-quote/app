@@ -87,10 +87,38 @@ Resources:
       Architectures:
         - x86_64
 
+  LambdaFunctionUrl:
+    Type: 'AWS::Lambda::Url'
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt LambdaFunction.Arn
+      Cors:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - '*'
+        AllowHeaders:
+          - '*'
+        MaxAge: 3600
+
+  LambdaUrlPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Action: 'lambda:InvokeFunctionUrl'
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
 Outputs:
   LambdaFunctionName:
     Description: Lambda function name
     Value: !Ref LambdaFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionName'
+
+  ApiUrl:
+    Description: API endpoint URL
+    Value: !GetAtt LambdaFunctionUrl.FunctionUrl
 
   LambdaArn:
     Description: Lambda function ARN
