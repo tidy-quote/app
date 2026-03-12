@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { signUpAndLogin } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
-  await page.goto("/");
+  await signUpAndLogin(page);
 });
 
 test("shows pricing setup CTA when no template configured", async ({
