@@ -15,7 +15,7 @@ Parameters:
   AiBaseUrl:
     Type: String
     Default: 'https://openrouter.ai/api/v1'
-    Description: AI provider base URL (OpenRouter, Groq, or any OpenAI-compatible API)
+    Description: AI provider base URL
 
   AiApiKey:
     Type: String
@@ -30,8 +30,7 @@ Parameters:
   JwtSecret:
     Type: String
     NoEcho: true
-    MinLength: 32
-    Description: JWT signing secret (min 32 characters)
+    Description: JWT signing secret
 
   LambdaCodeBucket:
     Type: String
@@ -43,7 +42,7 @@ Parameters:
 
 Resources:
   LambdaExecutionRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
       RoleName: quotesnap-lambda-role
       AssumeRolePolicyDocument:
@@ -52,7 +51,7 @@ Resources:
           - Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
+            Action: 'sts:AssumeRole'
       Policies:
         - PolicyName: lambda-basic-execution
           PolicyDocument:
@@ -60,13 +59,13 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: 'arn:aws:logs:*:*:*'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
 
   LambdaFunction:
-    Type: AWS::Lambda::Function
+    Type: 'AWS::Lambda::Function'
     Properties:
       FunctionName: quotesnap-api
       Runtime: provided.al2023
@@ -88,43 +87,10 @@ Resources:
       Architectures:
         - x86_64
 
-  LambdaFunctionUrl:
-    Type: AWS::Lambda::Url
-    Properties:
-      AuthType: NONE
-      TargetFunctionArn: !GetAtt LambdaFunction.Arn
-      Cors:
-        AllowOrigins:
-          - '*'
-        AllowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - OPTIONS
-        AllowHeaders:
-          - Content-Type
-          - Authorization
-        MaxAge: 3600
-
-  LambdaUrlPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt LambdaFunction.Arn
-      Action: lambda:InvokeFunctionUrl
-      Principal: '*'
-      FunctionUrlAuthType: NONE
-
 Outputs:
   LambdaFunctionName:
     Description: Lambda function name
     Value: !Ref LambdaFunction
-    Export:
-      Name: !Sub '${AWS::StackName}-FunctionName'
-
-  ApiUrl:
-    Description: API endpoint URL
-    Value: !GetAtt LambdaFunctionUrl.FunctionUrl
 
   LambdaArn:
     Description: Lambda function ARN

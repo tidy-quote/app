@@ -187,6 +187,18 @@ jobs:
             --stack-name ${{ env.BACKEND_STACK_NAME }} \
             --output json --query 'StackEvents[0:5]'
 
+          echo "=== Hook Results ==="
+          aws cloudformation describe-change-set-hooks \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --change-set-name "$CHANGESET_NAME" \
+            --output json 2>&1 || echo "describe-change-set-hooks not available"
+
+          echo "=== Lambda Function Schema (required properties) ==="
+          aws cloudformation describe-type \
+            --type RESOURCE \
+            --type-name 'AWS::Lambda::Function' \
+            --query 'Schema' --output text 2>&1 | python3 -c "import sys,json; s=json.loads(sys.stdin.read()); print('Required:', s.get('required',[])); [print(f'  {k}: required={v.get(\"required\",[])}') for k,v in s.get('properties',{}).items() if 'required' in str(v)]" 2>&1 || echo "Could not parse schema"
+
           # Execute if changeset succeeded
           CS_STATUS=$(aws cloudformation describe-change-set \
             --stack-name ${{ env.BACKEND_STACK_NAME }} \
@@ -213,11 +225,7 @@ jobs:
             --output text)
           echo "amplify-app-id=$APP_ID" >> "$GITHUB_OUTPUT"
 
-          API_URL=$(aws cloudformation describe-stacks \
-            --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
-            --output text)
-          echo "api-url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "api-url=pending" >> "$GITHUB_OUTPUT"
 
   deploy-backend:
     name: Deploy Backend Lambda
