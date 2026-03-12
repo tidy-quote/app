@@ -152,41 +152,57 @@ jobs:
 
       - name: Deploy backend infrastructure
         run: |
-          aws cloudformation deploy \
+          CHANGESET_NAME="deploy-$(date +%s)"
+
+          # Create changeset manually for better error diagnostics
+          aws cloudformation create-change-set \
             --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --template-file infra/cloudformation/backend.yaml \
+            --change-set-name "$CHANGESET_NAME" \
+            --change-set-type CREATE \
+            --template-body file://infra/cloudformation/backend.yaml \
             --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides \
-              MongoDbUri="${{ secrets.MONGODB_URI }}" \
-              MongoDbDatabase="${{ secrets.MONGODB_DATABASE }}" \
-              AiBaseUrl="${{ secrets.AI_BASE_URL }}" \
-              AiApiKey="${{ secrets.AI_API_KEY }}" \
-              AiModel="${{ secrets.AI_MODEL }}" \
-              JwtSecret="${{ secrets.JWT_SECRET }}" \
-              LambdaCodeBucket="${{ env.RELEASES_BUCKET }}" \
-              LambdaCodeKey="${{ env.LAMBDA_CODE_KEY }}" \
-            --no-fail-on-empty-changeset || {
-              echo "=== Deploy failed, gathering debug info ==="
+            --parameters \
+              ParameterKey=MongoDbUri,ParameterValue="${{ secrets.MONGODB_URI }}" \
+              ParameterKey=MongoDbDatabase,ParameterValue="${{ secrets.MONGODB_DATABASE }}" \
+              ParameterKey=AiBaseUrl,ParameterValue="${{ secrets.AI_BASE_URL }}" \
+              ParameterKey=AiApiKey,ParameterValue="${{ secrets.AI_API_KEY }}" \
+              ParameterKey=AiModel,ParameterValue="${{ secrets.AI_MODEL }}" \
+              ParameterKey=JwtSecret,ParameterValue="${{ secrets.JWT_SECRET }}" \
+              ParameterKey=LambdaCodeBucket,ParameterValue="${{ env.RELEASES_BUCKET }}" \
+              ParameterKey=LambdaCodeKey,ParameterValue="${{ env.LAMBDA_CODE_KEY }}"
 
-              echo "--- Stack Events (last 10) ---"
-              aws cloudformation describe-stack-events \
-                --stack-name ${{ env.BACKEND_STACK_NAME }} \
-                --max-items 10 \
-                --output json 2>/dev/null || echo "No stack events"
+          echo "Waiting for changeset..."
+          aws cloudformation wait change-set-create-complete \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --change-set-name "$CHANGESET_NAME" 2>&1 || true
 
-              echo "--- Changeset Details ---"
-              CHANGESET_ARN=$(aws cloudformation list-change-sets \
-                --stack-name ${{ env.BACKEND_STACK_NAME }} \
-                --query 'Summaries[0].ChangeSetId' \
-                --output text 2>/dev/null || echo "none")
-              if [ "$CHANGESET_ARN" != "none" ] && [ "$CHANGESET_ARN" != "None" ]; then
-                aws cloudformation describe-change-set \
-                  --change-set-name "$CHANGESET_ARN" \
-                  --output json 2>/dev/null || echo "No changeset"
-              fi
+          echo "=== Changeset Status ==="
+          aws cloudformation describe-change-set \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --change-set-name "$CHANGESET_NAME" \
+            --output json
 
-              exit 1
-            }
+          echo "=== Stack Events ==="
+          aws cloudformation describe-stack-events \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --output json --query 'StackEvents[0:5]'
+
+          # Execute if changeset succeeded
+          CS_STATUS=$(aws cloudformation describe-change-set \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --change-set-name "$CHANGESET_NAME" \
+            --query 'Status' --output text)
+
+          if [ "$CS_STATUS" = "CREATE_COMPLETE" ]; then
+            aws cloudformation execute-change-set \
+              --stack-name ${{ env.BACKEND_STACK_NAME }} \
+              --change-set-name "$CHANGESET_NAME"
+            aws cloudformation wait stack-create-complete \
+              --stack-name ${{ env.BACKEND_STACK_NAME }}
+          else
+            echo "Changeset failed with status: $CS_STATUS"
+            exit 1
+          fi
 
       - name: Get stack outputs
         id: get-outputs
