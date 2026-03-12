@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const TEST_EMAIL = `smoke-${Date.now()}@test.quotesnap.app`;
+const TEST_EMAIL = `smoke-${Date.now()}@test.tidyquote.app`;
 const TEST_PASSWORD = "SmokeTest123!";
 
 test.describe("Login flow", () => {
@@ -14,7 +14,7 @@ test.describe("Login flow", () => {
 
     await expect(page).toHaveURL("/");
     await expect(
-      page.getByRole("heading", { name: "Welcome to QuoteSnap" }),
+      page.getByRole("heading", { name: "Welcome to TidyQuote" }),
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Log out" }).click();
@@ -26,7 +26,7 @@ test.describe("Login flow", () => {
 
     await expect(page).toHaveURL("/");
     await expect(
-      page.getByRole("heading", { name: "Welcome to QuoteSnap" }),
+      page.getByRole("heading", { name: "Welcome to TidyQuote" }),
     ).toBeVisible();
   });
 });

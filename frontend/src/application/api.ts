@@ -2,7 +2,7 @@ import type { PricingTemplate, QuoteDraft, ToneOption } from "../domain/types";
 import { getToken } from "./auth";
 
 const API_BASE: string | undefined = import.meta.env.VITE_API_BASE;
-const STORAGE_KEY = "quotesnap:pricing-template";
+const STORAGE_KEY = "tidyquote:pricing-template";
 
 function hasBackend(): boolean {
   return API_BASE !== undefined && API_BASE !== "";

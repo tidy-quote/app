@@ -18,7 +18,7 @@ test("can sign up and access dashboard", async ({ page }) => {
   await page.getByRole("button", { name: "Sign Up" }).click();
 
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { name: "Welcome to QuoteSnap" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to TidyQuote" })).toBeVisible();
 });
 
 test("shows error when passwords do not match", async ({ page }) => {

@@ -29,7 +29,7 @@ export function LoginPage(): React.JSX.Element {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-logo">QuoteSnap</h1>
+        <h1 className="auth-logo">TidyQuote</h1>
         <h2 className="auth-title">Log in to your account</h2>
 
         {error && (

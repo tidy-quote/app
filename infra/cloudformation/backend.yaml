@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: QuoteSnap Backend - API Gateway + Lambda
+Description: TidyQuote Backend - API Gateway + Lambda
 
 Parameters:
   MongoDbUri:
@@ -9,7 +9,7 @@ Parameters:
 
   MongoDbDatabase:
     Type: String
-    Default: quotesnap
+    Default: tidyquote
     Description: MongoDB database name
 
   AiBaseUrl:
@@ -44,7 +44,7 @@ Resources:
   LambdaExecutionRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: quotesnap-lambda-role
+      RoleName: tidyquote-lambda-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -67,7 +67,7 @@ Resources:
   LambdaFunction:
     Type: 'AWS::Lambda::Function'
     Properties:
-      FunctionName: quotesnap-api
+      FunctionName: tidyquote-api
       Runtime: provided.al2023
       Handler: bootstrap
       Code:
@@ -90,7 +90,7 @@ Resources:
   HttpApi:
     Type: 'AWS::ApiGatewayV2::Api'
     Properties:
-      Name: quotesnap-api
+      Name: tidyquote-api
       ProtocolType: HTTP
       CorsConfiguration:
         AllowOrigins:

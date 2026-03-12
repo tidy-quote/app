@@ -5,14 +5,14 @@ use actix_cors::Cors;
 use actix_web::web::{self, Bytes, Data};
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 
-use quotesnap_backend::application::use_cases::auth::{validate_token, AuthUseCase};
-use quotesnap_backend::application::use_cases::manage_pricing::ManagePricingUseCase;
-use quotesnap_backend::application::use_cases::process_lead::ProcessLeadUseCase;
-use quotesnap_backend::domain::entities::*;
-use quotesnap_backend::domain::value_objects::*;
-use quotesnap_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
-use quotesnap_backend::infrastructure::mongo_store::MongoStore;
-use quotesnap_backend::presentation::handlers::{
+use tidyquote_backend::application::use_cases::auth::{validate_token, AuthUseCase};
+use tidyquote_backend::application::use_cases::manage_pricing::ManagePricingUseCase;
+use tidyquote_backend::application::use_cases::process_lead::ProcessLeadUseCase;
+use tidyquote_backend::domain::entities::*;
+use tidyquote_backend::domain::value_objects::*;
+use tidyquote_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
+use tidyquote_backend::infrastructure::mongo_store::MongoStore;
+use tidyquote_backend::presentation::handlers::{
     AuthRequest, AuthResponse, AuthUserResponse, SavePricingRequest, SubmitLeadRequest,
 };
 
@@ -64,7 +64,7 @@ async fn signup(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
                 email: result.email,
             },
         }),
-        Err(quotesnap_backend::application::use_cases::auth::AuthError::EmailTaken) => {
+        Err(tidyquote_backend::application::use_cases::auth::AuthError::EmailTaken) => {
             HttpResponse::Conflict().json(serde_json::json!({"error": "email already registered"}))
         }
         Err(e) => {
@@ -92,7 +92,7 @@ async fn login(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
                 email: result.email,
             },
         }),
-        Err(quotesnap_backend::application::use_cases::auth::AuthError::InvalidCredentials) => {
+        Err(tidyquote_backend::application::use_cases::auth::AuthError::InvalidCredentials) => {
             HttpResponse::Unauthorized().json(serde_json::json!({"error": "invalid credentials"}))
         }
         Err(e) => {
@@ -192,7 +192,7 @@ async fn main() -> std::io::Result<()> {
 
     let mongo_uri =
         env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
-    let mongo_db = env::var("MONGODB_DATABASE").unwrap_or_else(|_| "quotesnap".to_string());
+    let mongo_db = env::var("MONGODB_DATABASE").unwrap_or_else(|_| "tidyquote".to_string());
     let ai_base_url =
         env::var("AI_BASE_URL").unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
     let ai_api_key = env::var("AI_API_KEY").expect("AI_API_KEY must be set");
@@ -211,7 +211,7 @@ async fn main() -> std::io::Result<()> {
 
     let state = Data::new(Arc::new(AppState { store, ai_client }));
 
-    println!("QuoteSnap dev server running on http://localhost:{DEV_SERVER_PORT}");
+    println!("TidyQuote dev server running on http://localhost:{DEV_SERVER_PORT}");
 
     HttpServer::new(move || {
         let cors = Cors::default()

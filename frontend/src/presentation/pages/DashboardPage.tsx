@@ -14,7 +14,7 @@ export function DashboardPage(): React.JSX.Element {
 
   return (
     <div className="dashboard">
-      <h2 className="dashboard-title">Welcome to QuoteSnap</h2>
+      <h2 className="dashboard-title">Welcome to TidyQuote</h2>
       <p className="dashboard-subtitle">
         Generate professional quotes from customer messages in seconds.
       </p>

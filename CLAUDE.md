@@ -14,7 +14,7 @@ Code like Kent Beck. Prioritize simplicity, readability, and testability. Make t
 
 ## Project Overview
 
-**QuoteSnap** is an AI SaaS that helps solo residential cleaners turn messy inbound requests into clear quote drafts and follow-up messages.
+**TidyQuote** is an AI SaaS that helps solo residential cleaners turn messy inbound requests into clear quote drafts and follow-up messages.
 
 Core workflow: cleaner pastes a customer message or uploads a photo → AI extracts job details → generates a draft quote using the cleaner's pricing rules → produces a professional follow-up message.
 

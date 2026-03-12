@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use lambda_http::{run, service_fn, Body, Request, Response};
 
-use quotesnap_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
-use quotesnap_backend::infrastructure::mongo_store::MongoStore;
-use quotesnap_backend::presentation::handlers;
+use tidyquote_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
+use tidyquote_backend::infrastructure::mongo_store::MongoStore;
+use tidyquote_backend::presentation::handlers;
 
 struct AppState {
     store: MongoStore,
