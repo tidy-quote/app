@@ -194,7 +194,7 @@ jobs:
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           echo "Lambda deployed successfully"
 
-      - name: Fix Lambda URL access
+      - name: Debug Lambda URL auth
         run: |
           FUNCTION_NAME=$(aws cloudformation describe-stacks \
             --stack-name ${{ env.BACKEND_STACK_NAME }} \
@@ -206,15 +206,30 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
             --output text)
 
-          echo "=== Current resource policy ==="
-          aws lambda get-policy --function-name "$FUNCTION_NAME" || echo "No policy"
+          echo "=== Delete existing URL ==="
+          aws lambda delete-function-url-config --function-name "$FUNCTION_NAME" || true
 
-          echo "=== Removing existing permission ==="
-          aws lambda remove-permission \
+          echo "=== Remove all permissions ==="
+          POLICY=$(aws lambda get-policy --function-name "$FUNCTION_NAME" --output json 2>/dev/null || echo "{}")
+          echo "$POLICY" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          if 'Policy' in data:
+              policy = json.loads(data['Policy'])
+              for stmt in policy.get('Statement', []):
+                  print(stmt['Sid'])
+          " | while read SID; do
+            echo "Removing: $SID"
+            aws lambda remove-permission --function-name "$FUNCTION_NAME" --statement-id "$SID" || true
+          done
+
+          echo "=== Create fresh URL via CLI ==="
+          aws lambda create-function-url-config \
             --function-name "$FUNCTION_NAME" \
-            --statement-id "FunctionURLAllowPublicAccess" 2>/dev/null || true
+            --auth-type NONE \
+            --cors '{"AllowOrigins":["*"],"AllowMethods":["*"],"AllowHeaders":["*"],"MaxAge":3600}'
 
-          echo "=== Adding fresh permission via CLI ==="
+          echo "=== Add fresh permission ==="
           aws lambda add-permission \
             --function-name "$FUNCTION_NAME" \
             --statement-id "FunctionURLAllowPublicAccess" \
@@ -222,12 +237,16 @@ jobs:
             --principal "*" \
             --function-url-auth-type "NONE"
 
-          echo "=== Updated policy ==="
+          echo "=== New URL config ==="
+          NEW_URL=$(aws lambda get-function-url-config --function-name "$FUNCTION_NAME" --query 'FunctionUrl' --output text)
+          echo "URL: $NEW_URL"
+
+          echo "=== New policy ==="
           aws lambda get-policy --function-name "$FUNCTION_NAME"
 
-          echo "=== Test URL ==="
+          echo "=== Test new URL ==="
           sleep 5
-          curl -s -w "\nHTTP: %{http_code}\n" "$API_URL"
+          curl -s -w "\nHTTP: %{http_code}\n" "$NEW_URL"
 
   deploy-frontend:
     name: Deploy Frontend Site
