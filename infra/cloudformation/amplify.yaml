@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: QuoteSnap Amplify Hosting
+
+Parameters:
+  BasicAuthUsername:
+    Type: String
+    Default: admin
+    Description: Username for password protection
+
+  BasicAuthPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Password for password protection (min 8 characters)
+
+Resources:
+  AmplifyApp:
+    Type: AWS::Amplify::App
+    Properties:
+      Name: quotesnap
+      Platform: WEB
+      CustomRules:
+        - Source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>'
+          Target: /index.html
+          Status: '200'
+
+  AmplifyBranchMain:
+    Type: AWS::Amplify::Branch
+    Properties:
+      AppId: !GetAtt AmplifyApp.AppId
+      BranchName: main
+      EnableAutoBuild: false
+      Stage: PRODUCTION
+      BasicAuthConfig:
+        EnableBasicAuth: true
+        Username: !Ref BasicAuthUsername
+        Password: !Ref BasicAuthPassword
+
+Outputs:
+  AppId:
+    Description: Amplify App ID
+    Value: !GetAtt AmplifyApp.AppId
+    Export:
+      Name: !Sub "${AWS::StackName}-AppId"
+
+  BranchName:
+    Description: Amplify Branch Name
+    Value: main
+
+  AppUrl:
+    Description: Application URL
+    Value: !Sub "https://main.${AmplifyApp.DefaultDomain}"
+
+  DefaultDomain:
+    Description: Default Amplify domain
+    Value: !GetAtt AmplifyApp.DefaultDomain

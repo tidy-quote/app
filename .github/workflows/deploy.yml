@@ -1,0 +1,244 @@
+name: Deploy
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: eu-west-1
+  FRONTEND_STACK_NAME: quotesnap-amplify
+  BACKEND_STACK_NAME: quotesnap-backend
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+        env:
+          VITE_API_BASE: ${{ secrets.API_BASE_URL }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
+
+  build-backend:
+    name: Build Backend Lambda
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-release-
+
+      - name: Build Lambda binary
+        working-directory: backend
+        run: cargo build --release --target x86_64-unknown-linux-musl --bin quotesnap-backend
+        env:
+          JWT_SECRET: build-placeholder
+
+      - name: Package Lambda
+        run: |
+          cp backend/target/x86_64-unknown-linux-musl/release/quotesnap-backend bootstrap
+          zip lambda.zip bootstrap
+          rm bootstrap
+
+      - name: Upload Lambda artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-package
+          path: lambda.zip
+          retention-days: 1
+
+  deploy-infra:
+    name: Deploy Infrastructure
+    needs: [build-frontend, build-backend]
+    runs-on: ubuntu-latest
+    outputs:
+      amplify-app-id: ${{ steps.get-outputs.outputs.amplify-app-id }}
+      api-url: ${{ steps.get-outputs.outputs.api-url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOYER_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy frontend infrastructure
+        run: |
+          aws cloudformation deploy \
+            --stack-name ${{ env.FRONTEND_STACK_NAME }} \
+            --template-file infra/cloudformation/amplify.yaml \
+            --parameter-overrides \
+              BasicAuthUsername="${{ secrets.BASIC_AUTH_USERNAME }}" \
+              BasicAuthPassword="${{ secrets.BASIC_AUTH_PASSWORD }}" \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy backend infrastructure
+        run: |
+          aws cloudformation deploy \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --template-file infra/cloudformation/backend.yaml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              MongoDbUri="${{ secrets.MONGODB_URI }}" \
+              MongoDbDatabase="${{ secrets.MONGODB_DATABASE }}" \
+              AiBaseUrl="${{ secrets.AI_BASE_URL }}" \
+              AiApiKey="${{ secrets.AI_API_KEY }}" \
+              AiModel="${{ secrets.AI_MODEL }}" \
+              JwtSecret="${{ secrets.JWT_SECRET }}" \
+            --no-fail-on-empty-changeset
+
+      - name: Get stack outputs
+        id: get-outputs
+        run: |
+          APP_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.FRONTEND_STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`AppId`].OutputValue' \
+            --output text)
+          echo "amplify-app-id=$APP_ID" >> "$GITHUB_OUTPUT"
+
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+            --output text)
+          echo "api-url=$API_URL" >> "$GITHUB_OUTPUT"
+
+  deploy-backend:
+    name: Deploy Backend Lambda
+    needs: [build-backend, deploy-infra]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Lambda artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-package
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOYER_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Lambda code
+        run: |
+          FUNCTION_NAME=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
+            --output text)
+
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://lambda.zip
+
+          echo "Waiting for function update..."
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+          echo "Lambda deployed successfully"
+
+  deploy-frontend:
+    name: Deploy Frontend Site
+    needs: [build-frontend, deploy-infra]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOYER_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to Amplify
+        run: |
+          APP_ID="${{ needs.deploy-infra.outputs.amplify-app-id }}"
+          BRANCH_NAME="main"
+
+          # Stop any in-progress deployments
+          PENDING_JOBS=$(aws amplify list-jobs \
+            --app-id "$APP_ID" \
+            --branch-name "$BRANCH_NAME" \
+            --query "jobSummaries[?status=='PENDING' || status=='RUNNING'].jobId" \
+            --output text)
+
+          for JOB in $PENDING_JOBS; do
+            echo "Stopping in-progress job: $JOB"
+            aws amplify stop-job --app-id "$APP_ID" --branch-name "$BRANCH_NAME" --job-id "$JOB" || true
+          done
+
+          cd dist
+          zip -r ../deploy.zip .
+          cd ..
+
+          DEPLOYMENT_RESULT=$(aws amplify create-deployment \
+            --app-id "$APP_ID" \
+            --branch-name "$BRANCH_NAME")
+
+          UPLOAD_URL=$(echo "$DEPLOYMENT_RESULT" | jq -r '.zipUploadUrl')
+          JOB_ID=$(echo "$DEPLOYMENT_RESULT" | jq -r '.jobId')
+
+          echo "Uploading to Amplify..."
+          curl --fail -T deploy.zip "$UPLOAD_URL"
+
+          echo "Starting deployment (Job ID: $JOB_ID)..."
+          aws amplify start-deployment \
+            --app-id "$APP_ID" \
+            --branch-name "$BRANCH_NAME" \
+            --job-id "$JOB_ID"
+
+          echo "Frontend deployed successfully"

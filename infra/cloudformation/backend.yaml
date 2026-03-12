@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: QuoteSnap Backend - Lambda + API Gateway
+
+Parameters:
+  MongoDbUri:
+    Type: String
+    NoEcho: true
+    Description: MongoDB connection URI
+
+  MongoDbDatabase:
+    Type: String
+    Default: quotesnap
+    Description: MongoDB database name
+
+  AiBaseUrl:
+    Type: String
+    Default: https://openrouter.ai/api/v1
+    Description: AI provider base URL (OpenRouter, Groq, or any OpenAI-compatible API)
+
+  AiApiKey:
+    Type: String
+    NoEcho: true
+    Description: AI provider API key
+
+  AiModel:
+    Type: String
+    Default: google/gemini-3-flash-preview
+    Description: AI model identifier
+
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: JWT signing secret (min 32 characters)
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: quotesnap-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: quotesnap-api
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Code:
+        ZipFile: placeholder
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          MONGODB_URI: !Ref MongoDbUri
+          MONGODB_DATABASE: !Ref MongoDbDatabase
+          AI_BASE_URL: !Ref AiBaseUrl
+          AI_API_KEY: !Ref AiApiKey
+          AI_MODEL: !Ref AiModel
+          JWT_SECRET: !Ref JwtSecret
+      Architectures:
+        - x86_64
+
+  LambdaFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt LambdaFunction.Arn
+      Cors:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        MaxAge: 3600
+
+  LambdaUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  LambdaFunctionName:
+    Description: Lambda function name
+    Value: !Ref LambdaFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionName"
+
+  ApiUrl:
+    Description: API endpoint URL
+    Value: !GetAtt LambdaFunctionUrl.FunctionUrl
+
+  LambdaArn:
+    Description: Lambda function ARN
+    Value: !GetAtt LambdaFunction.Arn
