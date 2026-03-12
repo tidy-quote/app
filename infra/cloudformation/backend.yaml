@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: QuoteSnap Backend - Lambda + API Gateway
+Description: QuoteSnap Backend - Lambda Function
 
 Parameters:
   MongoDbUri:
@@ -14,7 +14,7 @@ Parameters:
 
   AiBaseUrl:
     Type: String
-    Default: https://openrouter.ai/api/v1
+    Default: 'https://openrouter.ai/api/v1'
     Description: AI provider base URL (OpenRouter, Groq, or any OpenAI-compatible API)
 
   AiApiKey:
@@ -53,8 +53,17 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: lambda-basic-execution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
 
   LambdaFunction:
     Type: AWS::Lambda::Function
@@ -90,6 +99,8 @@ Resources:
         AllowMethods:
           - GET
           - POST
+          - PUT
+          - DELETE
           - OPTIONS
         AllowHeaders:
           - Content-Type
@@ -109,7 +120,7 @@ Outputs:
     Description: Lambda function name
     Value: !Ref LambdaFunction
     Export:
-      Name: !Sub "${AWS::StackName}-FunctionName"
+      Name: !Sub '${AWS::StackName}-FunctionName'
 
   ApiUrl:
     Description: API endpoint URL
