@@ -6,7 +6,7 @@ use crate::application::ports::{PricingStore, StoreError, UserStore};
 use crate::domain::entities::{PricingTemplate, User};
 use crate::domain::value_objects::UserId;
 
-const DEFAULT_DB_NAME: &str = "tidyquote";
+const DEFAULT_DB_NAME: &str = "tidy-quote";
 const COLLECTION_PRICING_TEMPLATES: &str = "pricing_templates";
 const COLLECTION_USERS: &str = "users";
 

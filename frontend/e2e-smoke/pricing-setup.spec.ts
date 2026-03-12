@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const TEST_EMAIL = `smoke-pricing-${Date.now()}@test.tidyquote.app`;
+const TEST_EMAIL = `smoke-pricing-${Date.now()}@test.tidy-quote.app`;
 const TEST_PASSWORD = "SmokeTest123!";
 
 test.describe("Pricing setup flow", () => {

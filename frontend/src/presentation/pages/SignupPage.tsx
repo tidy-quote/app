@@ -36,7 +36,7 @@ export function SignupPage(): React.JSX.Element {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-logo">TidyQuote</h1>
+        <h1 className="auth-logo">Tidy-Quote</h1>
         <h2 className="auth-title">Create your account</h2>
 
         {error && (

@@ -14,10 +14,10 @@ concurrency:
 
 env:
   AWS_REGION: eu-west-1
-  FRONTEND_STACK_NAME: tidyquote-amplify
-  BACKEND_STACK_NAME: tidyquote-backend
+  FRONTEND_STACK_NAME: tidy-quote-amplify
+  BACKEND_STACK_NAME: tidy-quote-backend
   RELEASES_BUCKET: francescobarbera-releases
-  LAMBDA_CODE_KEY: tidyquote/lambda.zip
+  LAMBDA_CODE_KEY: tidy-quote/lambda.zip
 
 jobs:
   build-frontend:
@@ -81,13 +81,13 @@ jobs:
 
       - name: Build Lambda binary
         working-directory: backend
-        run: cargo build --release --target x86_64-unknown-linux-musl --bin tidyquote-backend
+        run: cargo build --release --target x86_64-unknown-linux-musl --bin tidy-quote-backend
         env:
           JWT_SECRET: build-placeholder
 
       - name: Package Lambda
         run: |
-          cp backend/target/x86_64-unknown-linux-musl/release/tidyquote-backend bootstrap
+          cp backend/target/x86_64-unknown-linux-musl/release/tidy-quote-backend bootstrap
           zip lambda.zip bootstrap
           rm bootstrap
 

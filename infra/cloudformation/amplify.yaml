@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: TidyQuote Amplify Hosting
+Description: Tidy-Quote Amplify Hosting
 
 Parameters:
   BasicAuthUsername:
@@ -17,7 +17,7 @@ Resources:
   AmplifyApp:
     Type: AWS::Amplify::App
     Properties:
-      Name: tidyquote
+      Name: tidy-quote
       Platform: WEB
       CustomRules:
         - Source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>'

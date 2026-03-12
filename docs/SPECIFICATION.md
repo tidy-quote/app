@@ -1,10 +1,10 @@
-# Specification: TidyQuote
+# Specification: Tidy-Quote
 
 ## 1. Product Summary
 
 Build a lightweight AI SaaS that helps solo residential cleaners turn messy inbound requests into clear quote drafts and follow-up messages.
 
-Product name: **TidyQuote**
+Product name: **Tidy-Quote**
 
 Core promise: **reply faster, quote more consistently, and win more cleaning jobs with less admin work.**
 
@@ -151,7 +151,7 @@ The MVP does only four things:
 ### 7.2 Daily Usage
 
 1. A new lead arrives on the cleaner's normal channel.
-2. The cleaner opens TidyQuote and pastes or uploads the lead.
+2. The cleaner opens Tidy-Quote and pastes or uploads the lead.
 3. The system returns:
 - job summary
 - missing questions

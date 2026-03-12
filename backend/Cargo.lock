@@ -2603,7 +2603,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tidyquote-backend"
+name = "tidy-quote-backend"
 version = "0.1.0"
 dependencies = [
  "actix-cors",

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: TidyQuote Backend - API Gateway + Lambda
+Description: Tidy-Quote Backend - API Gateway + Lambda
 
 Parameters:
   MongoDbUri:
@@ -9,7 +9,7 @@ Parameters:
 
   MongoDbDatabase:
     Type: String
-    Default: tidyquote
+    Default: tidy-quote
     Description: MongoDB database name
 
   AiBaseUrl:
@@ -44,7 +44,7 @@ Resources:
   LambdaExecutionRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: tidyquote-lambda-role
+      RoleName: tidy-quote-lambda-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -67,7 +67,7 @@ Resources:
   LambdaFunction:
     Type: 'AWS::Lambda::Function'
     Properties:
-      FunctionName: tidyquote-api
+      FunctionName: tidy-quote-api
       Runtime: provided.al2023
       Handler: bootstrap
       Code:
@@ -90,7 +90,7 @@ Resources:
   HttpApi:
     Type: 'AWS::ApiGatewayV2::Api'
     Properties:
-      Name: tidyquote-api
+      Name: tidy-quote-api
       ProtocolType: HTTP
       CorsConfiguration:
         AllowOrigins:

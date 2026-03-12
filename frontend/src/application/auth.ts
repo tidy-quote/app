@@ -1,8 +1,8 @@
 import type { AuthState, AuthUser } from "../domain/types";
 
 const API_BASE: string | undefined = import.meta.env.VITE_API_BASE;
-const TOKEN_KEY = "tidyquote:auth-token";
-const USER_KEY = "tidyquote:auth-user";
+const TOKEN_KEY = "tidy-quote:auth-token";
+const USER_KEY = "tidy-quote:auth-user";
 
 interface AuthApiResponse {
   token: string;
