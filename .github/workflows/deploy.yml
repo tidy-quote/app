@@ -150,9 +150,6 @@ jobs:
             echo "Stack status: $STACK_STATUS (no cleanup needed)"
           fi
 
-      - name: Validate backend template
-        run: aws cloudformation validate-template --template-body file://infra/cloudformation/backend.yaml
-
       - name: Deploy backend infrastructure
         run: |
           aws cloudformation deploy \
@@ -168,35 +165,28 @@ jobs:
               JwtSecret="${{ secrets.JWT_SECRET }}" \
               LambdaCodeBucket="${{ env.RELEASES_BUCKET }}" \
               LambdaCodeKey="${{ env.LAMBDA_CODE_KEY }}" \
-            --no-fail-on-empty-changeset || true
+            --no-fail-on-empty-changeset || {
+              echo "=== Deploy failed, gathering debug info ==="
 
-          echo "--- Stack Events ---"
-          aws cloudformation describe-stack-events \
-            --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].[LogicalResourceId,ResourceStatusReason]' \
-            --output table 2>/dev/null || true
+              echo "--- Stack Events (last 10) ---"
+              aws cloudformation describe-stack-events \
+                --stack-name ${{ env.BACKEND_STACK_NAME }} \
+                --max-items 10 \
+                --output json 2>/dev/null || echo "No stack events"
 
-          echo "--- Changeset Status ---"
-          CHANGESET_ARN=$(aws cloudformation list-change-sets \
-            --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --query 'Summaries[0].ChangeSetId' \
-            --output text 2>/dev/null || echo "none")
-          if [ "$CHANGESET_ARN" != "none" ] && [ "$CHANGESET_ARN" != "None" ]; then
-            aws cloudformation describe-change-set \
-              --change-set-name "$CHANGESET_ARN" \
-              --query '{Status:Status,StatusReason:StatusReason}' \
-              --output json
-          fi
+              echo "--- Changeset Details ---"
+              CHANGESET_ARN=$(aws cloudformation list-change-sets \
+                --stack-name ${{ env.BACKEND_STACK_NAME }} \
+                --query 'Summaries[0].ChangeSetId' \
+                --output text 2>/dev/null || echo "none")
+              if [ "$CHANGESET_ARN" != "none" ] && [ "$CHANGESET_ARN" != "None" ]; then
+                aws cloudformation describe-change-set \
+                  --change-set-name "$CHANGESET_ARN" \
+                  --output json 2>/dev/null || echo "No changeset"
+              fi
 
-          # Fail the step if the stack is not in a good state
-          STACK_STATUS=$(aws cloudformation describe-stacks \
-            --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --query 'Stacks[0].StackStatus' \
-            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
-          echo "Final stack status: $STACK_STATUS"
-          if [ "$STACK_STATUS" != "CREATE_COMPLETE" ] && [ "$STACK_STATUS" != "UPDATE_COMPLETE" ]; then
-            exit 1
-          fi
+              exit 1
+            }
 
       - name: Get stack outputs
         id: get-outputs
