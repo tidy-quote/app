@@ -1,3 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Petrolio palette — from MondoDesign.it */
+  --color-petrolio-dark: #1c3f44;
+  --color-petrolio: #1a7370;
+  --color-green: #55b895;
+  --color-cyan: #2cc0dc;
+  --color-gold: #ddb960;
+
+  /* Semantic mappings */
+  --color-primary: var(--color-petrolio);
+  --color-primary-hover: var(--color-petrolio-dark);
+  --color-primary-dark: #153538;
+  --color-primary-light: #e4f5f4;
+  --color-primary-glow: rgba(26, 115, 112, 0.18);
+
+  --color-accent: var(--color-green);
+  --color-accent-light: #ddf3ea;
+
+  --color-highlight: var(--color-cyan);
+  --color-highlight-light: #ddf5fb;
+
+  --color-gold-light: #fdf5e0;
+
+  --color-text: #1a2e35;
+  --color-text-muted: #4a6670;
+  --color-text-faint: #7a9aa5;
+
+  --color-bg: #f2f9f9;
+  --color-surface: #ffffff;
+  --color-border: #cddde1;
+  --color-border-light: #e5eff1;
+
+  --color-warning-bg: #fdf5e0;
+  --color-warning-border: var(--color-gold);
+  --color-warning-text: #7a5c1f;
+
+  --color-error-bg: #fef2f2;
+  --color-error-border: #f5a5a5;
+  --color-error-text: #8b1a1a;
+
+  --color-success-bg: #ddf3ea;
+  --color-success-border: var(--color-green);
+  --color-success-text: #1a5c38;
+
+  --shadow-sm: 0 1px 3px rgba(28, 63, 68, 0.06);
+  --shadow-md: 0 4px 16px rgba(28, 63, 68, 0.09);
+  --shadow-lg: 0 8px 30px rgba(28, 63, 68, 0.13);
+  --shadow-primary: 0 4px 18px rgba(26, 115, 112, 0.3);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 9999px;
+
+  --transition: 0.2s ease;
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 *,
 *::before,
 *::after {
@@ -10,10 +70,27 @@ html {
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
-  color: #111827;
-  background: #f9fafb;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+/* Shared animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
