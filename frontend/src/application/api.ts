@@ -1,16 +1,29 @@
 import type { PricingTemplate, QuoteDraft, ToneOption } from "../domain/types";
+import { getToken } from "./auth";
 
 const API_BASE: string | undefined = import.meta.env.VITE_API_BASE;
-const DEMO_USER_ID = "demo-user";
 const STORAGE_KEY = "quotesnap:pricing-template";
 
 function hasBackend(): boolean {
   return API_BASE !== undefined && API_BASE !== "";
 }
 
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     ...options,
   });
 
@@ -26,7 +39,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export async function getPricingTemplate(): Promise<PricingTemplate | null> {
   if (hasBackend()) {
-    return request<PricingTemplate>(`/pricing/${DEMO_USER_ID}`);
+    return request<PricingTemplate>("/api/pricing");
   }
 
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -39,16 +52,16 @@ export async function savePricingTemplate(
   template: PricingTemplate
 ): Promise<PricingTemplate> {
   if (hasBackend()) {
-    return request<PricingTemplate>(`/pricing/${template.id}`, {
-      method: "PUT",
+    return request<PricingTemplate>("/api/pricing", {
+      method: "POST",
       body: JSON.stringify(template),
     });
   }
 
   const toSave: PricingTemplate = {
     ...template,
-    id: template.id || DEMO_USER_ID,
-    userId: DEMO_USER_ID,
+    id: template.id || "local",
+    userId: "local-user",
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   return toSave;
@@ -60,7 +73,7 @@ export async function generateQuote(
   tone: ToneOption
 ): Promise<QuoteDraft> {
   if (hasBackend()) {
-    return request<QuoteDraft>("/quote", {
+    return request<QuoteDraft>("/api/quote", {
       method: "POST",
       body: JSON.stringify({ rawText, imageDataUrls, tone }),
     });

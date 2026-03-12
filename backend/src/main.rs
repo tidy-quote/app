@@ -17,6 +17,8 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
     let method = req.method().as_str();
 
     let response = match (method, path) {
+        ("POST", "/api/auth/signup") => handlers::handle_signup(req, &state.store).await,
+        ("POST", "/api/auth/login") => handlers::handle_login(req, &state.store).await,
         ("POST", "/api/pricing") => handlers::handle_save_pricing(req, &state.store).await,
         ("GET", "/api/pricing") => handlers::handle_get_pricing(req, &state.store).await,
         ("POST", "/api/quote") => {

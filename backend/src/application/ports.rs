@@ -14,6 +14,8 @@ pub enum StoreError {
     Serialization(String),
     #[error("store operation failed: {0}")]
     Internal(String),
+    #[error("duplicate email: {0}")]
+    DuplicateEmail(String),
 }
 
 #[derive(Debug, Error)]
@@ -32,6 +34,12 @@ pub enum AiError {
 pub trait PricingStore: Send + Sync {
     async fn get_template(&self, user_id: &UserId) -> Result<Option<PricingTemplate>, StoreError>;
     async fn save_template(&self, template: &PricingTemplate) -> Result<(), StoreError>;
+}
+
+#[async_trait]
+pub trait UserStore: Send + Sync {
+    async fn create_user(&self, user: &User) -> Result<(), StoreError>;
+    async fn find_by_email(&self, email: &str) -> Result<Option<User>, StoreError>;
 }
 
 #[async_trait]

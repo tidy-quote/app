@@ -6,6 +6,14 @@ use serde::{Deserialize, Serialize};
 use super::value_objects::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: UserId,
+    pub email: String,
+    pub password_hash: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceCategory {
     pub id: String,
     pub name: String,

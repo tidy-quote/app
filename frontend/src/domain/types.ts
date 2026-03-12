@@ -1,3 +1,13 @@
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
+export interface AuthState {
+  user: AuthUser | null;
+  token: string | null;
+}
+
 export interface ServiceCategory {
   id: string;
   name: string;

@@ -2,17 +2,19 @@ use std::env;
 use std::sync::Arc;
 
 use actix_cors::Cors;
-use actix_web::web::{self, Bytes, Data, Query};
-use actix_web::{App, HttpResponse, HttpServer};
-use serde::Deserialize;
+use actix_web::web::{self, Bytes, Data};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 
+use quotesnap_backend::application::use_cases::auth::{validate_token, AuthUseCase};
 use quotesnap_backend::application::use_cases::manage_pricing::ManagePricingUseCase;
 use quotesnap_backend::application::use_cases::process_lead::ProcessLeadUseCase;
 use quotesnap_backend::domain::entities::*;
 use quotesnap_backend::domain::value_objects::*;
 use quotesnap_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
 use quotesnap_backend::infrastructure::mongo_store::MongoStore;
-use quotesnap_backend::presentation::handlers::{SavePricingRequest, SubmitLeadRequest};
+use quotesnap_backend::presentation::handlers::{
+    AuthRequest, AuthResponse, AuthUserResponse, SavePricingRequest, SubmitLeadRequest,
+};
 
 const DEV_SERVER_PORT: u16 = 3001;
 
@@ -21,7 +23,97 @@ struct AppState {
     ai_client: OpenAiCompatibleClient,
 }
 
-async fn save_pricing(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+fn extract_user_id(req: &HttpRequest) -> Result<UserId, HttpResponse> {
+    let auth_header = req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| {
+            HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "missing Authorization header"}))
+        })?;
+
+    let token = auth_header.strip_prefix("Bearer ").ok_or_else(|| {
+        HttpResponse::Unauthorized()
+            .json(serde_json::json!({"error": "invalid Authorization header format"}))
+    })?;
+
+    let claims = validate_token(token).map_err(|_| {
+        HttpResponse::Unauthorized()
+            .json(serde_json::json!({"error": "invalid or expired token"}))
+    })?;
+
+    Ok(UserId::new(claims.sub))
+}
+
+async fn signup(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+    let payload: AuthRequest = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": format!("invalid JSON: {}", e)}))
+        }
+    };
+
+    let use_case = AuthUseCase::new(&state.store);
+
+    match use_case.signup(&payload.email, &payload.password).await {
+        Ok(result) => HttpResponse::Created().json(AuthResponse {
+            token: result.token,
+            user: AuthUserResponse {
+                id: result.user_id,
+                email: result.email,
+            },
+        }),
+        Err(quotesnap_backend::application::use_cases::auth::AuthError::EmailTaken) => {
+            HttpResponse::Conflict()
+                .json(serde_json::json!({"error": "email already registered"}))
+        }
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+async fn login(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+    let payload: AuthRequest = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": format!("invalid JSON: {}", e)}))
+        }
+    };
+
+    let use_case = AuthUseCase::new(&state.store);
+
+    match use_case.login(&payload.email, &payload.password).await {
+        Ok(result) => HttpResponse::Ok().json(AuthResponse {
+            token: result.token,
+            user: AuthUserResponse {
+                id: result.user_id,
+                email: result.email,
+            },
+        }),
+        Err(quotesnap_backend::application::use_cases::auth::AuthError::InvalidCredentials) => {
+            HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "invalid credentials"}))
+        }
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+async fn save_pricing(
+    req: HttpRequest,
+    state: Data<Arc<AppState>>,
+    body: Bytes,
+) -> HttpResponse {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
     let payload: SavePricingRequest = match serde_json::from_slice(&body) {
         Ok(p) => p,
         Err(e) => {
@@ -34,7 +126,7 @@ async fn save_pricing(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
 
     match use_case
         .save_template(
-            UserId::new(payload.user_id),
+            user_id,
             payload.currency,
             payload.country,
             payload.minimum_callout,
@@ -51,23 +143,18 @@ async fn save_pricing(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
     }
 }
 
-#[derive(Deserialize)]
-struct UserIdQuery {
-    user_id: Option<String>,
-}
-
-async fn get_pricing(state: Data<Arc<AppState>>, query: Query<UserIdQuery>) -> HttpResponse {
-    let user_id = match &query.user_id {
-        Some(id) if !id.is_empty() => id.clone(),
-        _ => {
-            return HttpResponse::BadRequest()
-                .json(serde_json::json!({"error": "missing user_id query parameter"}))
-        }
+async fn get_pricing(
+    req: HttpRequest,
+    state: Data<Arc<AppState>>,
+) -> HttpResponse {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
     };
 
     let use_case = ManagePricingUseCase::new(&state.store);
 
-    match use_case.get_template(&UserId::new(user_id)).await {
+    match use_case.get_template(&user_id).await {
         Ok(Some(template)) => HttpResponse::Ok().json(template),
         Ok(None) => HttpResponse::NotFound()
             .json(serde_json::json!({"error": "pricing template not found"})),
@@ -77,7 +164,16 @@ async fn get_pricing(state: Data<Arc<AppState>>, query: Query<UserIdQuery>) -> H
     }
 }
 
-async fn submit_lead(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+async fn submit_lead(
+    req: HttpRequest,
+    state: Data<Arc<AppState>>,
+    body: Bytes,
+) -> HttpResponse {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
     let payload: SubmitLeadRequest = match serde_json::from_slice(&body) {
         Ok(p) => p,
         Err(e) => {
@@ -88,7 +184,7 @@ async fn submit_lead(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
 
     let lead = Lead {
         id: LeadId::generate(),
-        user_id: UserId::new(payload.user_id),
+        user_id,
         raw_text: payload.raw_text,
         image_data: payload.image_data,
         created_at: chrono::Utc::now(),
@@ -106,6 +202,8 @@ async fn submit_lead(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let _ = dotenv::dotenv();
+
     let mongo_uri =
         env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
     let mongo_db = env::var("MONGODB_DATABASE").unwrap_or_else(|_| "quotesnap".to_string());
@@ -141,6 +239,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(cors)
             .app_data(state.clone())
+            .route("/api/auth/signup", web::post().to(signup))
+            .route("/api/auth/login", web::post().to(login))
             .route("/api/pricing", web::post().to(save_pricing))
             .route("/api/pricing", web::get().to(get_pricing))
             .route("/api/quote", web::post().to(submit_lead))
