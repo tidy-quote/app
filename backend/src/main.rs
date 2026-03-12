@@ -1,18 +1,11 @@
-#![allow(dead_code)]
-
-mod application;
-mod domain;
-mod infrastructure;
-mod presentation;
-
 use std::env;
 use std::sync::Arc;
 
 use lambda_http::{run, service_fn, Body, Request, Response};
 
-use infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
-use infrastructure::mongo_store::MongoStore;
-use presentation::handlers;
+use quotesnap_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
+use quotesnap_backend::infrastructure::mongo_store::MongoStore;
+use quotesnap_backend::presentation::handlers;
 
 struct AppState {
     store: MongoStore,

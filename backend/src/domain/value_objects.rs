@@ -31,3 +31,21 @@ define_id!(UserId);
 define_id!(TemplateId);
 define_id!(LeadId);
 define_id!(QuoteId);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_id_new_and_as_str() {
+        let id = UserId::new("user-123");
+        assert_eq!(id.as_str(), "user-123");
+    }
+
+    #[test]
+    fn quote_id_generate_produces_unique_values() {
+        let id1 = QuoteId::generate();
+        let id2 = QuoteId::generate();
+        assert_ne!(id1, id2);
+    }
+}

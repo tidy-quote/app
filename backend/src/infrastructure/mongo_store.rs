@@ -6,7 +6,7 @@ use crate::application::ports::{PricingStore, StoreError};
 use crate::domain::entities::PricingTemplate;
 use crate::domain::value_objects::UserId;
 
-const DB_NAME: &str = "quotesnap";
+const DEFAULT_DB_NAME: &str = "quotesnap";
 const COLLECTION_PRICING_TEMPLATES: &str = "pricing_templates";
 
 pub struct MongoStore {
@@ -15,11 +15,15 @@ pub struct MongoStore {
 
 impl MongoStore {
     pub async fn new(connection_uri: &str) -> Result<Self, StoreError> {
+        Self::with_database(connection_uri, DEFAULT_DB_NAME).await
+    }
+
+    pub async fn with_database(connection_uri: &str, db_name: &str) -> Result<Self, StoreError> {
         let client = Client::with_uri_str(connection_uri)
             .await
             .map_err(|e| StoreError::Connection(e.to_string()))?;
 
-        let db = client.database(DB_NAME);
+        let db = client.database(db_name);
         let collection = db.collection::<PricingTemplate>(COLLECTION_PRICING_TEMPLATES);
 
         Ok(Self { collection })

@@ -72,7 +72,10 @@ impl<'a> ProcessLeadUseCase<'a> {
     }
 }
 
-fn calculate_price(summary: &JobSummary, template: &PricingTemplate) -> (f64, Vec<PriceLineItem>) {
+pub(crate) fn calculate_price(
+    summary: &JobSummary,
+    template: &PricingTemplate,
+) -> (f64, Vec<PriceLineItem>) {
     let mut breakdown = Vec::new();
     let mut total = 0.0;
 
@@ -102,7 +105,7 @@ fn calculate_price(summary: &JobSummary, template: &PricingTemplate) -> (f64, Ve
     (total, breakdown)
 }
 
-fn build_clarification_message(missing_info: &[String]) -> String {
+pub(crate) fn build_clarification_message(missing_info: &[String]) -> String {
     let items: Vec<String> = missing_info
         .iter()
         .enumerate()
@@ -113,4 +116,126 @@ fn build_clarification_message(missing_info: &[String]) -> String {
         "Before I can give you a final quote, I need a few more details:\n{}",
         items.join("\n")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    fn make_template(categories: Vec<(&str, f64)>, minimum_callout: f64) -> PricingTemplate {
+        PricingTemplate {
+            id: TemplateId::generate(),
+            user_id: UserId::new("test-user"),
+            currency: "GBP".to_string(),
+            country: "UK".to_string(),
+            minimum_callout,
+            categories: categories
+                .into_iter()
+                .enumerate()
+                .map(|(i, (name, price))| ServiceCategory {
+                    id: format!("cat-{}", i),
+                    name: name.to_string(),
+                    base_price: price,
+                    description: String::new(),
+                })
+                .collect(),
+            add_ons: Vec::new(),
+            custom_notes: String::new(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn make_summary(service_type: &str) -> JobSummary {
+        JobSummary {
+            service_type: service_type.to_string(),
+            property_size: None,
+            requested_date: None,
+            requested_time: None,
+            missing_info: Vec::new(),
+            extracted_details: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn calculates_price_from_matching_category() {
+        let template = make_template(vec![("Deep Clean", 120.0), ("Regular Clean", 80.0)], 0.0);
+        let summary = make_summary("Deep Clean");
+
+        let (total, breakdown) = calculate_price(&summary, &template);
+
+        assert_eq!(total, 120.0);
+        assert_eq!(breakdown.len(), 1);
+        assert_eq!(breakdown[0].description, "Deep Clean");
+        assert_eq!(breakdown[0].amount, 120.0);
+    }
+
+    #[test]
+    fn applies_minimum_callout_when_price_below() {
+        let template = make_template(vec![("Quick Tidy", 20.0)], 50.0);
+        let summary = make_summary("Quick Tidy");
+
+        let (total, breakdown) = calculate_price(&summary, &template);
+
+        assert_eq!(total, 50.0);
+        assert_eq!(breakdown.len(), 2);
+        assert_eq!(breakdown[0].amount, 20.0);
+        assert_eq!(breakdown[1].description, "Minimum callout fee");
+        assert_eq!(breakdown[1].amount, 30.0);
+    }
+
+    #[test]
+    fn returns_zero_when_no_category_matches() {
+        let template = make_template(vec![("Deep Clean", 120.0)], 0.0);
+        let summary = make_summary("Window Washing");
+
+        let (total, breakdown) = calculate_price(&summary, &template);
+
+        assert_eq!(total, 0.0);
+        assert!(breakdown.is_empty());
+    }
+
+    #[test]
+    fn case_insensitive_category_matching() {
+        let template = make_template(vec![("Deep Clean", 120.0)], 0.0);
+        let summary = make_summary("deep clean");
+
+        let (total, breakdown) = calculate_price(&summary, &template);
+
+        assert_eq!(total, 120.0);
+        assert_eq!(breakdown.len(), 1);
+    }
+
+    #[test]
+    fn formats_single_missing_item() {
+        let missing = vec!["property size".to_string()];
+
+        let message = build_clarification_message(&missing);
+
+        assert_eq!(
+            message,
+            "Before I can give you a final quote, I need a few more details:\n1. property size"
+        );
+    }
+
+    #[test]
+    fn formats_multiple_missing_items() {
+        let missing = vec![
+            "property size".to_string(),
+            "preferred date".to_string(),
+            "access instructions".to_string(),
+        ];
+
+        let message = build_clarification_message(&missing);
+
+        assert_eq!(
+            message,
+            "Before I can give you a final quote, I need a few more details:\n\
+             1. property size\n\
+             2. preferred date\n\
+             3. access instructions"
+        );
+    }
 }
