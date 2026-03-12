@@ -33,6 +33,14 @@ Parameters:
     MinLength: 32
     Description: JWT signing secret (min 32 characters)
 
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing Lambda code
+
+  LambdaCodeKey:
+    Type: String
+    Description: S3 key for Lambda zip package
+
 Resources:
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -55,7 +63,8 @@ Resources:
       Runtime: provided.al2023
       Handler: bootstrap
       Code:
-        ZipFile: placeholder
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeKey
       MemorySize: 256
       Timeout: 30
       Role: !GetAtt LambdaExecutionRole.Arn

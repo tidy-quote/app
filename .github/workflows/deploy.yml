@@ -16,6 +16,8 @@ env:
   AWS_REGION: eu-west-1
   FRONTEND_STACK_NAME: quotesnap-amplify
   BACKEND_STACK_NAME: quotesnap-backend
+  RELEASES_BUCKET: francescobarbera-releases
+  LAMBDA_CODE_KEY: quotesnap/lambda.zip
 
 jobs:
   build-frontend:
@@ -114,6 +116,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOYER_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Download Lambda artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-package
+
+      - name: Upload Lambda code to S3
+        run: aws s3 cp lambda.zip "s3://${{ env.RELEASES_BUCKET }}/${{ env.LAMBDA_CODE_KEY }}"
+
       - name: Deploy frontend infrastructure
         run: |
           aws cloudformation deploy \
@@ -137,6 +147,8 @@ jobs:
               AiApiKey="${{ secrets.AI_API_KEY }}" \
               AiModel="${{ secrets.AI_MODEL }}" \
               JwtSecret="${{ secrets.JWT_SECRET }}" \
+              LambdaCodeBucket="${{ env.RELEASES_BUCKET }}" \
+              LambdaCodeKey="${{ env.LAMBDA_CODE_KEY }}" \
             --no-fail-on-empty-changeset
 
       - name: Get stack outputs
@@ -156,15 +168,10 @@ jobs:
 
   deploy-backend:
     name: Deploy Backend Lambda
-    needs: [build-backend, deploy-infra]
+    needs: [deploy-infra]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Lambda artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: lambda-package
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -180,7 +187,8 @@ jobs:
 
           aws lambda update-function-code \
             --function-name "$FUNCTION_NAME" \
-            --zip-file fileb://lambda.zip
+            --s3-bucket "${{ env.RELEASES_BUCKET }}" \
+            --s3-key "${{ env.LAMBDA_CODE_KEY }}"
 
           echo "Waiting for function update..."
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
