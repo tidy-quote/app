@@ -194,7 +194,7 @@ jobs:
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           echo "Lambda deployed successfully"
 
-      - name: Debug Lambda URL auth
+      - name: Fix Lambda URL access
         run: |
           FUNCTION_NAME=$(aws cloudformation describe-stacks \
             --stack-name ${{ env.BACKEND_STACK_NAME }} \
@@ -206,21 +206,28 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
             --output text)
 
-          echo "=== Function URL Config ==="
-          aws lambda get-function-url-config --function-name "$FUNCTION_NAME"
+          echo "=== Current resource policy ==="
+          aws lambda get-policy --function-name "$FUNCTION_NAME" || echo "No policy"
 
-          echo "=== Resource Policy ==="
+          echo "=== Removing existing permission ==="
+          aws lambda remove-permission \
+            --function-name "$FUNCTION_NAME" \
+            --statement-id "FunctionURLAllowPublicAccess" 2>/dev/null || true
+
+          echo "=== Adding fresh permission via CLI ==="
+          aws lambda add-permission \
+            --function-name "$FUNCTION_NAME" \
+            --statement-id "FunctionURLAllowPublicAccess" \
+            --action "lambda:InvokeFunctionUrl" \
+            --principal "*" \
+            --function-url-auth-type "NONE"
+
+          echo "=== Updated policy ==="
           aws lambda get-policy --function-name "$FUNCTION_NAME"
 
-          echo "=== Test direct invoke ==="
-          aws lambda invoke \
-            --function-name "$FUNCTION_NAME" \
-            --payload '{"requestContext":{"http":{"method":"GET","path":"/"}},"rawPath":"/","headers":{}}' \
-            --cli-binary-format raw-in-base64-out \
-            /tmp/response.json && cat /tmp/response.json || echo "Invoke failed"
-
-          echo "=== Test URL from runner ==="
-          curl -s -w "\nHTTP: %{http_code}\n" "$API_URL" || echo "Curl failed"
+          echo "=== Test URL ==="
+          sleep 5
+          curl -s -w "\nHTTP: %{http_code}\n" "$API_URL"
 
   deploy-frontend:
     name: Deploy Frontend Site
