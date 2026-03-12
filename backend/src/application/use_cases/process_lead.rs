@@ -59,7 +59,7 @@ impl<'a> ProcessLeadUseCase<'a> {
 
         let follow_up = self
             .ai_client
-            .generate_follow_up(&quote.job_summary, &quote, &tone)
+            .generate_follow_up(&quote.job_summary, &quote, &tone, &template.currency)
             .await?;
         quote.follow_up_message = follow_up;
 

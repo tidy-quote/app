@@ -11,6 +11,8 @@ use crate::domain::value_objects::UserId;
 const BCRYPT_COST: u32 = 12;
 const TOKEN_EXPIRY_HOURS: i64 = 24;
 const JWT_SECRET_ENV: &str = "JWT_SECRET";
+const MIN_PASSWORD_LENGTH: usize = 8;
+const MAX_PASSWORD_LENGTH: usize = 72;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
@@ -24,6 +26,10 @@ pub enum AuthError {
     HashError(String),
     #[error("token generation failed: {0}")]
     TokenError(String),
+    #[error("invalid email format")]
+    InvalidEmail,
+    #[error("password must be between {MIN_PASSWORD_LENGTH} and {MAX_PASSWORD_LENGTH} characters")]
+    InvalidPassword,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,6 +55,9 @@ impl<'a> AuthUseCase<'a> {
     }
 
     pub async fn signup(&self, email: &str, password: &str) -> Result<AuthResult, AuthError> {
+        validate_email(email)?;
+        validate_password(password)?;
+
         let password_hash = bcrypt::hash(password, BCRYPT_COST)
             .map_err(|e| AuthError::HashError(e.to_string()))?;
 
@@ -101,7 +110,21 @@ impl<'a> AuthUseCase<'a> {
 }
 
 fn jwt_secret() -> String {
-    env::var(JWT_SECRET_ENV).unwrap_or_else(|_| "dev-secret-do-not-use-in-production".to_string())
+    env::var(JWT_SECRET_ENV).expect("JWT_SECRET environment variable must be set")
+}
+
+fn validate_email(email: &str) -> Result<(), AuthError> {
+    if email.is_empty() || !email.contains('@') || !email.contains('.') {
+        return Err(AuthError::InvalidEmail);
+    }
+    Ok(())
+}
+
+fn validate_password(password: &str) -> Result<(), AuthError> {
+    if password.len() < MIN_PASSWORD_LENGTH || password.len() > MAX_PASSWORD_LENGTH {
+        return Err(AuthError::InvalidPassword);
+    }
+    Ok(())
 }
 
 fn generate_token(user_id: &str, email: &str) -> Result<String, AuthError> {
@@ -134,20 +157,48 @@ pub fn validate_token(token: &str) -> Result<Claims, AuthError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
+
+    fn with_jwt_secret<F: FnOnce()>(f: F) {
+        let _lock = TEST_MUTEX.lock().unwrap();
+        unsafe { env::set_var(JWT_SECRET_ENV, "test-secret") };
+        f();
+    }
 
     #[test]
     fn generates_and_validates_token() {
-        env::set_var(JWT_SECRET_ENV, "test-secret");
-        let token = generate_token("user-123", "test@example.com").unwrap();
-        let claims = validate_token(&token).unwrap();
-        assert_eq!(claims.sub, "user-123");
-        assert_eq!(claims.email, "test@example.com");
+        with_jwt_secret(|| {
+            let token = generate_token("user-123", "test@example.com").unwrap();
+            let claims = validate_token(&token).unwrap();
+            assert_eq!(claims.sub, "user-123");
+            assert_eq!(claims.email, "test@example.com");
+        });
     }
 
     #[test]
     fn rejects_invalid_token() {
-        env::set_var(JWT_SECRET_ENV, "test-secret");
-        let result = validate_token("invalid-token");
-        assert!(result.is_err());
+        with_jwt_secret(|| {
+            let result = validate_token("invalid-token");
+            assert!(result.is_err());
+        });
+    }
+
+    #[test]
+    fn rejects_invalid_email() {
+        assert!(matches!(validate_email(""), Err(AuthError::InvalidEmail)));
+        assert!(matches!(validate_email("no-at-sign"), Err(AuthError::InvalidEmail)));
+        assert!(validate_email("test@example.com").is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_password() {
+        assert!(matches!(validate_password("short"), Err(AuthError::InvalidPassword)));
+        assert!(matches!(
+            validate_password(&"x".repeat(73)),
+            Err(AuthError::InvalidPassword)
+        ));
+        assert!(validate_password("validpass").is_ok());
     }
 }

@@ -55,5 +55,6 @@ pub trait AiClient: Send + Sync {
         summary: &JobSummary,
         quote: &QuoteDraft,
         tone: &ToneOption,
+        currency: &str,
     ) -> Result<String, AiError>;
 }

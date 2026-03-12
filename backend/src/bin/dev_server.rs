@@ -245,7 +245,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/pricing", web::get().to(get_pricing))
             .route("/api/quote", web::post().to(submit_lead))
     })
-    .bind(("0.0.0.0", DEV_SERVER_PORT))?
+    .bind(("127.0.0.1", DEV_SERVER_PORT))?
     .run()
     .await
 }

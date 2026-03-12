@@ -122,7 +122,12 @@ pub async fn handle_signup(req: Request, user_store: &dyn UserStore) -> Response
             },
         ),
         Err(AuthError::EmailTaken) => error_response(409, "email already registered"),
-        Err(e) => error_response(500, &e.to_string()),
+        Err(AuthError::InvalidEmail) => error_response(400, "invalid email format"),
+        Err(AuthError::InvalidPassword) => error_response(400, "password must be between 8 and 72 characters"),
+        Err(e) => {
+            eprintln!("signup error: {e}");
+            error_response(500, "an internal error occurred")
+        }
     }
 }
 
@@ -151,7 +156,10 @@ pub async fn handle_login(req: Request, user_store: &dyn UserStore) -> Response<
             },
         ),
         Err(AuthError::InvalidCredentials) => error_response(401, "invalid credentials"),
-        Err(e) => error_response(500, &e.to_string()),
+        Err(e) => {
+            eprintln!("login error: {e}");
+            error_response(500, "an internal error occurred")
+        }
     }
 }
 
@@ -186,7 +194,10 @@ pub async fn handle_save_pricing(req: Request, store: &dyn PricingStore) -> Resp
         .await
     {
         Ok(template) => json_response(200, template),
-        Err(e) => error_response(500, &e.to_string()),
+        Err(e) => {
+            eprintln!("save pricing error: {e}");
+            error_response(500, "an internal error occurred")
+        }
     }
 }
 
@@ -201,7 +212,10 @@ pub async fn handle_get_pricing(req: Request, store: &dyn PricingStore) -> Respo
     match use_case.get_template(&user_id).await {
         Ok(Some(template)) => json_response(200, template),
         Ok(None) => error_response(404, "pricing template not found"),
-        Err(e) => error_response(500, &e.to_string()),
+        Err(e) => {
+            eprintln!("get pricing error: {e}");
+            error_response(500, "an internal error occurred")
+        }
     }
 }
 
@@ -237,6 +251,9 @@ pub async fn handle_submit_lead(
 
     match use_case.execute(&lead, payload.tone).await {
         Ok(quote) => json_response(200, quote),
-        Err(e) => error_response(500, &e.to_string()),
+        Err(e) => {
+            eprintln!("submit lead error: {e}");
+            error_response(500, "an internal error occurred")
+        }
     }
 }

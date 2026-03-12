@@ -115,10 +115,13 @@ impl OpenAiCompatibleClient {
         }
 
         for image in &lead.image_data {
+            let url = if image.starts_with("data:") {
+                image.clone()
+            } else {
+                format!("data:image/jpeg;base64,{}", image)
+            };
             parts.push(ContentPart::ImageUrl {
-                image_url: ImageUrlContent {
-                    url: format!("data:image/jpeg;base64,{}", image),
-                },
+                image_url: ImageUrlContent { url },
             });
         }
 
@@ -182,6 +185,7 @@ Respond with valid JSON matching this schema:
         summary: &JobSummary,
         quote: &QuoteDraft,
         tone: &ToneOption,
+        currency: &str,
     ) -> Result<String, AiError> {
         let tone_instruction = match tone {
             ToneOption::Friendly => "Use a warm, friendly, and approachable tone.",
@@ -203,7 +207,7 @@ Include the estimated price and a brief summary. Keep it under 200 words."#,
             "Job summary: {}\nEstimated price: {:.2} {}\nPrice breakdown: {}",
             serde_json::to_string(summary).unwrap_or_default(),
             quote.estimated_price,
-            "currency",
+            currency,
             serde_json::to_string(&quote.price_breakdown).unwrap_or_default()
         );
 

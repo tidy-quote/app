@@ -39,13 +39,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export async function getPricingTemplate(): Promise<PricingTemplate | null> {
   if (hasBackend()) {
-    return request<PricingTemplate>("/api/pricing");
+    try {
+      return await request<PricingTemplate>("/api/pricing");
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("not found")) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
 
-  return JSON.parse(stored) as PricingTemplate;
+  try {
+    return JSON.parse(stored) as PricingTemplate;
+  } catch {
+    return null;
+  }
 }
 
 export async function savePricingTemplate(
@@ -75,7 +86,7 @@ export async function generateQuote(
   if (hasBackend()) {
     return request<QuoteDraft>("/api/quote", {
       method: "POST",
-      body: JSON.stringify({ rawText, imageDataUrls, tone }),
+      body: JSON.stringify({ raw_text: rawText, image_data: imageDataUrls, tone }),
     });
   }
 
