@@ -194,6 +194,25 @@ jobs:
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           echo "Lambda deployed successfully"
 
+      - name: Debug Lambda URL auth
+        run: |
+          FUNCTION_NAME=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
+            --output text)
+
+          echo "=== Function URL Config ==="
+          aws lambda get-function-url-config --function-name "$FUNCTION_NAME" || echo "No URL config found"
+
+          echo "=== Resource Policy ==="
+          aws lambda get-policy --function-name "$FUNCTION_NAME" || echo "No resource policy found"
+
+          echo "=== CloudFormation Resources ==="
+          aws cloudformation describe-stack-resources \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --query 'StackResources[*].[LogicalResourceId,ResourceType,ResourceStatus]' \
+            --output table
+
   deploy-frontend:
     name: Deploy Frontend Site
     needs: [build-frontend, deploy-infra]
