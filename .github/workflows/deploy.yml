@@ -149,14 +149,7 @@ jobs:
               JwtSecret="${{ secrets.JWT_SECRET }}" \
               LambdaCodeBucket="${{ env.RELEASES_BUCKET }}" \
               LambdaCodeKey="${{ env.LAMBDA_CODE_KEY }}" \
-            --no-fail-on-empty-changeset || {
-            echo "=== Stack events ==="
-            aws cloudformation describe-stack-events \
-              --stack-name ${{ env.BACKEND_STACK_NAME }} \
-              --query 'StackEvents[?contains(ResourceStatus, `FAILED`) || contains(ResourceStatus, `ROLLBACK`)].[LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
-              --output table
-            exit 1
-          }
+            --no-fail-on-empty-changeset
 
       - name: Get stack outputs
         id: get-outputs
@@ -200,12 +193,6 @@ jobs:
           echo "Waiting for function update..."
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           echo "Lambda deployed successfully"
-
-      - name: Test API endpoint
-        run: |
-          API_URL="${{ needs.deploy-infra.outputs.api-url }}"
-          echo "Testing API at: $API_URL"
-          curl -s -w "\nHTTP: %{http_code}\n" "$API_URL/api/auth/signup" || true
 
   deploy-frontend:
     name: Deploy Frontend Site
