@@ -149,7 +149,14 @@ jobs:
               JwtSecret="${{ secrets.JWT_SECRET }}" \
               LambdaCodeBucket="${{ env.RELEASES_BUCKET }}" \
               LambdaCodeKey="${{ env.LAMBDA_CODE_KEY }}" \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset || {
+            echo "=== Stack events ==="
+            aws cloudformation describe-stack-events \
+              --stack-name ${{ env.BACKEND_STACK_NAME }} \
+              --query 'StackEvents[?contains(ResourceStatus, `FAILED`) || contains(ResourceStatus, `ROLLBACK`)].[LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
+              --output table
+            exit 1
+          }
 
       - name: Get stack outputs
         id: get-outputs
