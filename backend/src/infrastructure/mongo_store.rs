@@ -65,7 +65,7 @@ impl MongoStore {
 #[async_trait]
 impl PricingStore for MongoStore {
     async fn get_template(&self, user_id: &UserId) -> Result<Option<PricingTemplate>, StoreError> {
-        let filter = doc! { "user_id": user_id.as_str() };
+        let filter = doc! { "userId": user_id.as_str() };
 
         self.pricing_collection
             .find_one(filter)
@@ -74,7 +74,7 @@ impl PricingStore for MongoStore {
     }
 
     async fn save_template(&self, template: &PricingTemplate) -> Result<(), StoreError> {
-        let filter = doc! { "user_id": template.user_id.as_str() };
+        let filter = doc! { "userId": template.user_id.as_str() };
 
         self.pricing_collection
             .replace_one(filter, template)
