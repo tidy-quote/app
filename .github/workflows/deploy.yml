@@ -201,17 +201,26 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
             --output text)
 
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.BACKEND_STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+            --output text)
+
           echo "=== Function URL Config ==="
-          aws lambda get-function-url-config --function-name "$FUNCTION_NAME" || echo "No URL config found"
+          aws lambda get-function-url-config --function-name "$FUNCTION_NAME"
 
           echo "=== Resource Policy ==="
-          aws lambda get-policy --function-name "$FUNCTION_NAME" || echo "No resource policy found"
+          aws lambda get-policy --function-name "$FUNCTION_NAME"
 
-          echo "=== CloudFormation Resources ==="
-          aws cloudformation describe-stack-resources \
-            --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --query 'StackResources[*].[LogicalResourceId,ResourceType,ResourceStatus]' \
-            --output table
+          echo "=== Test direct invoke ==="
+          aws lambda invoke \
+            --function-name "$FUNCTION_NAME" \
+            --payload '{"requestContext":{"http":{"method":"GET","path":"/"}},"rawPath":"/","headers":{}}' \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/response.json && cat /tmp/response.json || echo "Invoke failed"
+
+          echo "=== Test URL from runner ==="
+          curl -s -w "\nHTTP: %{http_code}\n" "$API_URL" || echo "Curl failed"
 
   deploy-frontend:
     name: Deploy Frontend Site
