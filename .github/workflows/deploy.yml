@@ -201,14 +201,11 @@ jobs:
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           echo "Lambda deployed successfully"
 
-      - name: Cleanup old Lambda function URL
+      - name: Test API endpoint
         run: |
-          FUNCTION_NAME=$(aws cloudformation describe-stacks \
-            --stack-name ${{ env.BACKEND_STACK_NAME }} \
-            --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
-            --output text)
-
-          aws lambda delete-function-url-config --function-name "$FUNCTION_NAME" 2>/dev/null || true
+          API_URL="${{ needs.deploy-infra.outputs.api-url }}"
+          echo "Testing API at: $API_URL"
+          curl -s -w "\nHTTP: %{http_code}\n" "$API_URL/api/auth/signup" || true
 
   deploy-frontend:
     name: Deploy Frontend Site
