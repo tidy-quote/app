@@ -165,6 +165,7 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
             --output text)
           echo "api-url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "::notice::API URL: $API_URL"
 
   deploy-backend:
     name: Deploy Backend Lambda
