@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::application::ports::{AiClient, PricingStore, UserStore};
 use crate::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
 use crate::application::use_cases::manage_pricing::ManagePricingUseCase;
-use crate::application::use_cases::process_lead::ProcessLeadUseCase;
+use crate::application::use_cases::process_lead::{ProcessLeadError, ProcessLeadUseCase};
 use crate::domain::entities::*;
 use crate::domain::value_objects::*;
 
@@ -254,6 +254,9 @@ pub async fn handle_submit_lead(
 
     match use_case.execute(&lead, payload.tone).await {
         Ok(quote) => json_response(200, quote),
+        Err(ProcessLeadError::TemplateNotFound) => {
+            error_response(404, "pricing template not found — please set up your pricing first")
+        }
         Err(e) => {
             eprintln!("submit lead error: {e}");
             error_response(500, "an internal error occurred")
