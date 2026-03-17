@@ -17,7 +17,7 @@ export default defineConfig({
   use: {
     baseURL: deployedUrl,
     screenshot: "only-on-failure",
-    trace: "on",
+    trace: "on-first-retry",
     httpCredentials: {
       username: process.env.BASIC_AUTH_USERNAME ?? "",
       password: process.env.BASIC_AUTH_PASSWORD ?? "",
