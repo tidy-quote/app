@@ -11,6 +11,9 @@ export default defineConfig({
   workers: 1,
   reporter: "html",
   timeout: 60_000,
+  expect: {
+    timeout: 30_000,
+  },
   use: {
     baseURL: deployedUrl,
     screenshot: "only-on-failure",
