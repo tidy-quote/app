@@ -1,0 +1,29 @@
+name: Check Lambda Logs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOYER_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Fetch recent Lambda logs
+        run: |
+          aws logs filter-log-events \
+            --log-group-name /aws/lambda/tidy-quote-api \
+            --start-time $(date -d '30 minutes ago' +%s000) \
+            --filter-pattern "error" \
+            --query 'events[].message' \
+            --output text | tail -50
+          echo "---"
+          aws logs tail /aws/lambda/tidy-quote-api --since 30m --format short 2>&1 | tail -80
