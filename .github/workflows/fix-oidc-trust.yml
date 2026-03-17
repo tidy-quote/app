@@ -1,0 +1,76 @@
+name: Fix OIDC Trust Policy
+
+on:
+  workflow_dispatch:
+    inputs:
+      role_name:
+        description: 'IAM role name to update (from AWS_DEPLOYER_ROLE_ARN)'
+        required: true
+        default: 'tidy-quote-github-deployer'
+
+env:
+  GITHUB_REPO: tidy-quote/app
+
+jobs:
+  update-trust:
+    name: Update IAM Trust Policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+
+      - name: Get current trust policy
+        run: |
+          echo "Current trust policy:"
+          aws iam get-role --role-name "${{ inputs.role_name }}" --query 'Role.AssumeRolePolicyDocument' --output json | jq .
+
+      - name: Get OIDC provider ARN
+        id: oidc
+        run: |
+          OIDC_ARN=$(aws iam list-open-id-connect-providers \
+            --query "OpenIDConnectProviderList[?ends_with(Arn, 'token.actions.githubusercontent.com')].Arn" \
+            --output text)
+          echo "oidc-arn=$OIDC_ARN" >> "$GITHUB_OUTPUT"
+          echo "OIDC Provider ARN: $OIDC_ARN"
+
+      - name: Update trust policy
+        run: |
+          TRUST_POLICY=$(cat <<'POLICY'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "${{ steps.oidc.outputs.oidc-arn }}"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringLike": {
+                    "token.actions.githubusercontent.com:sub": "repo:${{ env.GITHUB_REPO }}:*"
+                  },
+                  "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                  }
+                }
+              }
+            ]
+          }
+          POLICY
+          )
+
+          aws iam update-assume-role-policy \
+            --role-name "${{ inputs.role_name }}" \
+            --policy-document "$TRUST_POLICY"
+
+          echo "Trust policy updated for repo: ${{ env.GITHUB_REPO }}"
+
+      - name: Verify updated trust policy
+        run: |
+          echo "Updated trust policy:"
+          aws iam get-role --role-name "${{ inputs.role_name }}" --query 'Role.AssumeRolePolicyDocument' --output json | jq .
