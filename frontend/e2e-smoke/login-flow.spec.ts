@@ -12,7 +12,8 @@ test.describe("Login flow", () => {
     await page.getByLabel("Confirm Password").fill(TEST_PASSWORD);
     await page.getByRole("button", { name: "Sign Up" }).click();
 
-    await expect(page).toHaveURL("/");
+    await page.waitForURL("/", { timeout: 30_000 });
+    await page.waitForLoadState("networkidle");
     await expect(
       page.getByRole("heading", { name: "Welcome to Tidy-Quote" }),
     ).toBeVisible();
