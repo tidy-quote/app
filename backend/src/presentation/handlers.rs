@@ -254,9 +254,10 @@ pub async fn handle_submit_lead(
 
     match use_case.execute(&lead, payload.tone).await {
         Ok(quote) => json_response(200, quote),
-        Err(ProcessLeadError::TemplateNotFound) => {
-            error_response(404, "pricing template not found — please set up your pricing first")
-        }
+        Err(ProcessLeadError::TemplateNotFound) => error_response(
+            404,
+            "pricing template not found — please set up your pricing first",
+        ),
         Err(e) => {
             eprintln!("submit lead error: {e}");
             error_response(500, "an internal error occurred")
