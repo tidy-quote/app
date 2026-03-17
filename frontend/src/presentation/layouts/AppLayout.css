@@ -9,36 +9,62 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1.25rem;
-  background: linear-gradient(135deg, var(--color-petrolio-dark) 0%, var(--color-petrolio) 100%);
+  background: var(--cl-white);
+  border-bottom: 1px solid var(--cl-border-light);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
+.app-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cl-amber), transparent);
+  opacity: 0.3;
+}
+
 .app-logo {
   margin: 0;
-  font-size: 1.25rem;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
   font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.02em;
+  color: var(--cl-amber);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-logo-img {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
 }
 
 .btn-logout {
   padding: 0.375rem 0.875rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-full);
-  font-size: 0.8rem;
+  background: transparent;
+  color: var(--cl-text-muted);
+  border: 1px solid var(--cl-border);
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
   font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all var(--transition);
 }
 
 .btn-logout:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.35);
+  color: var(--cl-amber);
+  border-color: var(--cl-amber);
+  background: rgba(200, 137, 10, 0.04);
 }
 
 .btn-logout:active {
@@ -47,7 +73,7 @@
 
 .app-main {
   flex: 1;
-  padding: 1.25rem 1rem;
+  padding: 1.5rem 1rem;
   overflow-y: auto;
   padding-bottom: 5.5rem;
   animation: fadeInUp 0.4s ease;
@@ -60,10 +86,21 @@
   right: 0;
   display: flex;
   justify-content: space-around;
-  padding: 0.5rem 0.75rem;
-  background: var(--color-surface);
-  box-shadow: 0 -2px 16px rgba(28, 63, 68, 0.08);
+  padding: 0;
+  background: var(--cl-white);
+  border-top: 1px solid var(--cl-border-light);
   z-index: 10;
+}
+
+.app-nav::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cl-amber), transparent);
+  opacity: 0.2;
 }
 
 .nav-link {
@@ -71,50 +108,52 @@
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-display);
+  font-size: 0.55rem;
   font-weight: 500;
-  color: var(--color-text-faint);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cl-text-faint);
   text-decoration: none;
-  border-radius: var(--radius-md);
+  border-radius: 0;
   transition: all var(--transition);
   position: relative;
+  flex: 1;
 }
 
 .nav-link:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-light);
-  transform: translateY(-1px);
+  color: var(--cl-text-muted);
+  background: var(--cl-frost);
 }
 
 .nav-link:active {
-  transform: translateY(0) scale(0.95);
+  transform: scale(0.95);
 }
 
 .nav-link.active {
-  color: var(--color-primary);
+  color: var(--cl-amber);
   font-weight: 600;
-  background: var(--color-primary-light);
+  background: rgba(200, 137, 10, 0.04);
 }
 
 .nav-link.active::after {
   content: '';
   position: absolute;
-  bottom: -0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 1.25rem;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-petrolio), var(--color-cyan));
-  border-radius: var(--radius-full);
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--cl-amber);
+  box-shadow: 0 0 6px rgba(200, 137, 10, 0.3);
 }
 
 .nav-icon {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.1rem;
+  height: 1.1rem;
   transition: transform var(--transition);
 }
 
 .nav-link:hover .nav-icon {
-  transform: scale(1.15);
+  transform: scale(1.1);
 }

@@ -1,61 +1,83 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap');
 
 :root {
-  /* Petrolio palette — from MondoDesign.it */
-  --color-petrolio-dark: #1c3f44;
-  --color-petrolio: #1a7370;
-  --color-green: #55b895;
-  --color-cyan: #2cc0dc;
-  --color-gold: #ddb960;
+  /* Clean clinical palette */
+  --cl-white: #ffffff;
+  --cl-frost: #f6f8fa;
+  --cl-ice: #edf1f5;
+  --cl-panel: #f0f3f7;
+  --cl-border: #d4dbe4;
+  --cl-border-light: #e2e8f0;
+
+  --cl-amber: #c8890a;
+  --cl-gold: #daa520;
+  --cl-amber-light: #f0c850;
+  --cl-teal: #2a8e94;
+  --cl-teal-dim: #3aafb6;
+  --cl-slate: #3e5570;
+
+  --cl-text: #2c3e50;
+  --cl-text-bright: #1a2530;
+  --cl-text-muted: #7a8ea0;
+  --cl-text-faint: #a8b8c8;
 
   /* Semantic mappings */
-  --color-primary: var(--color-petrolio);
-  --color-primary-hover: var(--color-petrolio-dark);
-  --color-primary-dark: #153538;
-  --color-primary-light: #e4f5f4;
-  --color-primary-glow: rgba(26, 115, 112, 0.18);
+  --color-primary: var(--cl-amber);
+  --color-primary-hover: #b07a08;
+  --color-primary-dark: #8a5810;
+  --color-primary-light: rgba(200, 137, 10, 0.06);
+  --color-primary-glow: rgba(200, 137, 10, 0.18);
 
-  --color-accent: var(--color-green);
-  --color-accent-light: #ddf3ea;
+  --color-accent: var(--cl-teal);
+  --color-accent-light: rgba(42, 142, 148, 0.06);
 
-  --color-highlight: var(--color-cyan);
-  --color-highlight-light: #ddf5fb;
+  --color-highlight: var(--cl-gold);
+  --color-highlight-light: rgba(218, 165, 32, 0.06);
 
-  --color-gold-light: #fdf5e0;
+  --color-gold: var(--cl-gold);
+  --color-gold-light: rgba(218, 165, 32, 0.06);
+  --color-cyan: var(--cl-teal);
+  --color-petrolio: var(--cl-teal);
+  --color-petrolio-dark: #1a5c60;
+  --color-green: var(--cl-teal);
 
-  --color-text: #1a2e35;
-  --color-text-muted: #4a6670;
-  --color-text-faint: #7a9aa5;
+  --color-text: var(--cl-text);
+  --color-text-muted: var(--cl-text-muted);
+  --color-text-faint: var(--cl-text-faint);
 
-  --color-bg: #f2f9f9;
-  --color-surface: #ffffff;
-  --color-border: #cddde1;
-  --color-border-light: #e5eff1;
+  --color-bg: var(--cl-frost);
+  --color-surface: var(--cl-white);
+  --color-border: var(--cl-border);
+  --color-border-light: var(--cl-border-light);
 
-  --color-warning-bg: #fdf5e0;
-  --color-warning-border: var(--color-gold);
-  --color-warning-text: #7a5c1f;
+  --color-warning-bg: rgba(218, 165, 32, 0.06);
+  --color-warning-border: rgba(218, 165, 32, 0.3);
+  --color-warning-text: #8a6a10;
 
-  --color-error-bg: #fef2f2;
-  --color-error-border: #f5a5a5;
-  --color-error-text: #8b1a1a;
+  --color-error-bg: rgba(200, 50, 50, 0.05);
+  --color-error-border: rgba(200, 50, 50, 0.25);
+  --color-error-text: #b83030;
 
-  --color-success-bg: #ddf3ea;
-  --color-success-border: var(--color-green);
-  --color-success-text: #1a5c38;
+  --color-success-bg: rgba(42, 142, 148, 0.06);
+  --color-success-border: rgba(42, 142, 148, 0.25);
+  --color-success-text: var(--cl-teal);
 
-  --shadow-sm: 0 1px 3px rgba(28, 63, 68, 0.06);
-  --shadow-md: 0 4px 16px rgba(28, 63, 68, 0.09);
-  --shadow-lg: 0 8px 30px rgba(28, 63, 68, 0.13);
-  --shadow-primary: 0 4px 18px rgba(26, 115, 112, 0.3);
+  --shadow-sm: 0 1px 3px rgba(44, 62, 80, 0.05);
+  --shadow-md: 0 4px 16px rgba(44, 62, 80, 0.07);
+  --shadow-lg: 0 8px 32px rgba(44, 62, 80, 0.1);
+  --shadow-primary: 0 4px 20px rgba(200, 137, 10, 0.15);
 
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-full: 9999px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-full: 0px;
 
   --transition: 0.2s ease;
   --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --font-display: 'Orbitron', 'Share Tech Mono', monospace;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
 }
 
 *,
@@ -70,12 +92,12 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-body);
   font-size: 1rem;
-  line-height: 1.5;
-  color: var(--color-text);
-  background: var(--color-bg);
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--cl-text);
+  background: var(--cl-frost);
 }
 
 /* Shared animations */
@@ -93,4 +115,24 @@ body {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+/* Selection */
+::selection {
+  background: rgba(200, 137, 10, 0.2);
+  color: var(--cl-text-bright);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cl-frost);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cl-border);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cl-amber);
 }

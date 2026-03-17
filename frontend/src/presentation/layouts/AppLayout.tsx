@@ -43,7 +43,7 @@ export function AppLayout(): React.JSX.Element {
   return (
     <div className="app-layout">
       <header className="app-header">
-        <h1 className="app-logo">Tidy-Quote</h1>
+        <h1 className="app-logo"><img src="/logo.svg" alt="" className="app-logo-img" />Tidy-Quote</h1>
         <button type="button" className="btn-logout" onClick={handleLogout}>
           Log out
         </button>

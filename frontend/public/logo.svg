@@ -1,42 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <defs>
-    <linearGradient id="handle" x1="0.5" y1="0" x2="0.5" y2="1">
-      <stop offset="0%" stop-color="#f5c842"/>
-      <stop offset="100%" stop-color="#e88a18"/>
-    </linearGradient>
-    <linearGradient id="bristle" x1="0.5" y1="0" x2="0.5" y2="1">
-      <stop offset="0%" stop-color="#4ddbb5"/>
-      <stop offset="50%" stop-color="#2cc0dc"/>
-      <stop offset="100%" stop-color="#1a6fa0"/>
-    </linearGradient>
-    <linearGradient id="band" x1="0.5" y1="0" x2="0.5" y2="1">
-      <stop offset="0%" stop-color="#3ddbb0"/>
-      <stop offset="100%" stop-color="#1a9e8f"/>
-    </linearGradient>
-  </defs>
-
-  <g transform="translate(256,260) rotate(-20) translate(-256,-260)">
-
-    <!-- Handle stick -->
-    <rect x="244" y="155" width="24" height="150" rx="6" fill="url(#handle)"/>
-
-    <!-- Dollar sign "$" as a single path -->
-    <!-- Vertical bar -->
-    <rect x="250" y="28" width="12" height="132" rx="6" fill="url(#handle)"/>
-    <!-- S curve: top half curves right, bottom half curves left -->
-    <path d="M 280 58 C 260 38, 226 44, 226 66 C 226 88, 260 92, 280 96 C 300 100, 290 132, 264 136 C 244 138, 228 128, 228 128" stroke="url(#handle)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-
-    <!-- Broom head band -->
-    <rect x="214" y="298" width="84" height="44" rx="10" fill="url(#band)"/>
-    <rect x="222" y="312" width="68" height="4" rx="2" fill="#ffffff" opacity="0.5"/>
-    <rect x="222" y="324" width="68" height="4" rx="2" fill="#ffffff" opacity="0.3"/>
-
-    <!-- Bristles -->
-    <path d="M224 342 C216 390, 185 435, 148 478" stroke="url(#bristle)" stroke-width="18" stroke-linecap="round" fill="none"/>
-    <path d="M240 342 C236 395, 216 442, 192 480" stroke="url(#bristle)" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.9"/>
-    <path d="M256 342 C256 400, 250 448, 240 482" stroke="url(#bristle)" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.85"/>
-    <path d="M272 342 C276 400, 284 446, 292 482" stroke="url(#bristle)" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.8"/>
-    <path d="M288 342 C298 395, 322 440, 348 476" stroke="url(#bristle)" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.7"/>
-    <path d="M298 342 C314 388, 350 432, 384 464" stroke="url(#bristle)" stroke-width="16" stroke-linecap="round" fill="none" opacity="0.6"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<path d="M 664.0 394.5 L 548.5 393.0 L 578.0 356.5 L 687.0 356.5 L 688.5 359.0 L 664.0 394.5 Z" fill="#c8890a"/>
+<path d="M 393.0 720.5 L 324.0 681.5 L 319.5 676.0 L 437.5 555.0 L 434.0 547.5 L 285.0 661.5 L 245.5 639.0 L 443.0 497.5 L 443.0 494.5 L 205.0 618.5 L 156.5 590.0 L 387.0 484.5 L 521.0 407.5 L 596.0 407.5 L 597.5 409.0 L 560.0 462.5 L 508.0 462.5 L 466.5 522.0 L 489.5 555.0 L 458.0 599.5 L 428.0 599.5 L 403.5 631.0 L 453.5 634.0 L 393.0 720.5 Z" fill="#c8890a"/>
+<path d="M 698.0 337.5 L 632.5 336.0 L 747.0 177.5 L 810.0 177.5 L 807.5 185.0 L 698.0 337.5 Z" fill="#2a8e94"/>
+<path d="M 448.0 748.5 L 419.5 734.0 L 502.5 632.0 L 584.0 631.5 L 627.5 552.0 L 623.0 548.5 L 516.0 524.5 L 514.5 522.0 L 538.0 492.5 L 659.0 492.5 L 675.5 466.0 L 675.0 462.5 L 599.5 461.0 L 637.0 407.5 L 676.0 407.5 L 715.5 464.0 L 613.5 670.0 L 519.0 717.5 L 519.5 712.0 L 546.5 665.0 L 544.0 660.5 L 539.0 659.5 L 488.0 728.5 L 448.0 748.5 Z" fill="#2a8e94"/>
+<path d="M 638.0 667.5 L 634.5 666.0 L 668.0 601.5 L 863.0 546.5 L 865.5 548.0 L 778.0 596.5 L 638.0 667.5 Z" fill="#2a8e94"/>
+<path d="M 553.0 599.5 L 459.5 598.0 L 487.5 557.0 L 494.0 554.5 L 570.0 572.5 L 571.5 575.0 L 553.0 599.5 Z" fill="#2a8e94"/>
+<path d="M 517.0 786.5 L 461.5 757.0 L 524.0 727.5 L 620.0 688.5 L 859.0 598.5 L 864.5 599.0 L 675.0 706.5 L 517.0 786.5 Z" fill="#2a8e94"/>
 </svg>
