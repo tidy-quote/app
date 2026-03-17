@@ -165,12 +165,12 @@ Available service categories: {}
 
 Respond with valid JSON matching this schema:
 {{
-  "service_type": "string (must match a category name)",
-  "property_size": "string or null",
-  "requested_date": "string or null",
-  "requested_time": "string or null",
-  "missing_info": ["list of things you need clarified"],
-  "extracted_details": {{"key": "value pairs of any other relevant details"}}
+  "serviceType": "string (must match a category name)",
+  "propertySize": "string or null",
+  "requestedDate": "string or null",
+  "requestedTime": "string or null",
+  "missingInfo": ["list of things you need clarified"],
+  "extractedDetails": {{"key": "value pairs of any other relevant details"}}
 }}"#,
             categories_json
         );

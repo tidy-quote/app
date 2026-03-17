@@ -37,7 +37,7 @@ test("can select tone options", async ({ page }) => {
   await page.goto("/quote/new");
 
   for (const tone of ["Friendly", "Direct", "Premium"]) {
-    await page.getByLabel(tone).check();
+    await page.getByText(tone, { exact: true }).click();
     await expect(page.getByLabel(tone)).toBeChecked();
   }
 });
