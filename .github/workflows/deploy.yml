@@ -249,7 +249,21 @@ jobs:
             --branch-name "$BRANCH_NAME" \
             --job-id "$JOB_ID"
 
-          echo "Frontend deployed successfully"
+          echo "Waiting for deployment to complete..."
+          while true; do
+            STATUS=$(aws amplify get-job \
+              --app-id "$APP_ID" \
+              --branch-name "$BRANCH_NAME" \
+              --job-id "$JOB_ID" \
+              --query 'job.summary.status' \
+              --output text)
+            echo "  Status: $STATUS"
+            case "$STATUS" in
+              SUCCEED) echo "Frontend deployed successfully"; break ;;
+              FAILED|CANCELLED) echo "Deployment failed with status: $STATUS"; exit 1 ;;
+              *) sleep 5 ;;
+            esac
+          done
 
   smoke-test:
     name: Smoke Test
