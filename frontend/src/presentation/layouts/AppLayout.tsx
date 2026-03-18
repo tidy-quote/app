@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../components/useAuth";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import "./AppLayout.css";
 
 function DashboardIcon(): React.JSX.Element {
@@ -53,7 +54,9 @@ export function AppLayout(): React.JSX.Element {
       </header>
 
       <main className="app-main">
-        <Outlet />
+        <ErrorBoundary fallback="page">
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       <nav className="app-nav">
