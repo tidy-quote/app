@@ -94,6 +94,9 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
             handlers::handle_get_usage(req, &state.store, &state.store, &state.allowed_price_ids)
                 .await
         }
+        ("GET", "/api/subscription") => {
+            handlers::handle_get_subscription(req, &state.store).await
+        }
         ("GET", "/api/quotes") => {
             handlers::handle_list_quotes(req, &state.store, &state.store).await
         }

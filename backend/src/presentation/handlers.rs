@@ -798,3 +798,27 @@ pub async fn handle_stripe_webhook(
         }
     }
 }
+
+pub async fn handle_get_subscription(req: Request, user_store: &dyn UserStore) -> Response<Body> {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    let user = match user_store.find_by_id(&user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => return error_response(401, "user not found"),
+        Err(e) => {
+            error!(event = "get_subscription_error", error = %e);
+            return error_response(500, "an internal error occurred");
+        }
+    };
+
+    json_response(
+        200,
+        serde_json::json!({
+            "status": user.subscription_status,
+            "plan": user.subscription_plan,
+        }),
+    )
+}

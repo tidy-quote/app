@@ -164,6 +164,18 @@ export async function getQuote(id: string): Promise<QuoteDraft | null> {
   return null;
 }
 
+export interface SubscriptionInfo {
+  status: string;
+  plan: string | null;
+}
+
+export async function getSubscriptionStatus(): Promise<SubscriptionInfo> {
+  if (hasBackend()) {
+    return request<SubscriptionInfo>("/api/subscription");
+  }
+  return { status: "active", plan: null };
+}
+
 export async function createCheckoutSession(
   priceId: string
 ): Promise<string> {
