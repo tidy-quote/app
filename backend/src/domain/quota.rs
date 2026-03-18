@@ -1,4 +1,5 @@
 use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
+use serde::Serialize;
 
 const STARTER_QUOTA: u32 = 5;
 const SOLO_QUOTA: u32 = 75;
@@ -18,11 +19,70 @@ pub struct PlanConfig {
     pub pro_price_id: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanInfo {
+    pub name: String,
+    pub price_id: String,
+    pub price: String,
+    pub description: String,
+    pub features: Vec<String>,
+    pub quota: Option<u32>,
+    pub featured: bool,
+}
+
 impl PlanConfig {
     pub fn contains(&self, price_id: &str) -> bool {
         price_id == self.starter_price_id
             || price_id == self.solo_price_id
             || price_id == self.pro_price_id
+    }
+
+    pub fn plans(&self) -> Vec<PlanInfo> {
+        vec![
+            PlanInfo {
+                name: "Starter".to_string(),
+                price_id: self.starter_price_id.clone(),
+                price: "$1.99".to_string(),
+                description: "Try it out with a few quotes each month.".to_string(),
+                features: vec![
+                    "5 AI quote generations per month".to_string(),
+                    "1 pricing template".to_string(),
+                    "Job summary extraction".to_string(),
+                    "Follow-up message drafts".to_string(),
+                ],
+                quota: Some(STARTER_QUOTA),
+                featured: false,
+            },
+            PlanInfo {
+                name: "Solo".to_string(),
+                price_id: self.solo_price_id.clone(),
+                price: "$8.99".to_string(),
+                description: "For cleaners quoting multiple jobs a week.".to_string(),
+                features: vec![
+                    "75 AI quote generations per month".to_string(),
+                    "Multiple pricing templates".to_string(),
+                    "All tone options".to_string(),
+                    "Photo & screenshot uploads".to_string(),
+                ],
+                quota: Some(SOLO_QUOTA),
+                featured: true,
+            },
+            PlanInfo {
+                name: "Pro".to_string(),
+                price_id: self.pro_price_id.clone(),
+                price: "$19.99".to_string(),
+                description: "For busy cleaners who quote every day.".to_string(),
+                features: vec![
+                    "Unlimited quote generations".to_string(),
+                    "Multi-location pricing templates".to_string(),
+                    "Priority AI processing".to_string(),
+                    "Everything in Solo".to_string(),
+                ],
+                quota: None,
+                featured: false,
+            },
+        ]
     }
 }
 

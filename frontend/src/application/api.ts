@@ -176,6 +176,27 @@ export async function getSubscriptionStatus(): Promise<SubscriptionInfo> {
   return { status: "active", plan: null };
 }
 
+export interface PlanInfo {
+  name: string;
+  priceId: string;
+  price: string;
+  description: string;
+  features: string[];
+  quota: number | null;
+  featured: boolean;
+}
+
+export async function getPlans(): Promise<PlanInfo[]> {
+  if (hasBackend()) {
+    return request<PlanInfo[]>("/api/plans");
+  }
+  return [
+    { name: "Starter", priceId: "mock_starter", price: "$1.99", description: "Try it out with a few quotes each month.", features: ["5 AI quote generations per month", "1 pricing template", "Job summary extraction", "Follow-up message drafts"], quota: 5, featured: false },
+    { name: "Solo", priceId: "mock_solo", price: "$8.99", description: "For cleaners quoting multiple jobs a week.", features: ["75 AI quote generations per month", "Multiple pricing templates", "All tone options", "Photo & screenshot uploads"], quota: 75, featured: true },
+    { name: "Pro", priceId: "mock_pro", price: "$19.99", description: "For busy cleaners who quote every day.", features: ["Unlimited quote generations", "Multi-location pricing templates", "Priority AI processing", "Everything in Solo"], quota: null, featured: false },
+  ];
+}
+
 export async function createCheckoutSession(
   priceId: string
 ): Promise<string> {

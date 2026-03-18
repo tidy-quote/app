@@ -866,3 +866,7 @@ pub async fn handle_get_subscription(
         }),
     )
 }
+
+pub fn handle_get_plans(plan_config: &PlanConfig) -> Response<Body> {
+    json_response(200, plan_config.plans())
+}

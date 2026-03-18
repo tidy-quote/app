@@ -110,6 +110,7 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
         ("GET", "/api/subscription") => {
             handlers::handle_get_subscription(req, &state.store, &state.jwt_secret).await
         }
+        ("GET", "/api/plans") => handlers::handle_get_plans(&state.plan_config),
         ("GET", "/api/quotes") => {
             handlers::handle_list_quotes(req, &state.store, &state.store, &state.jwt_secret).await
         }
