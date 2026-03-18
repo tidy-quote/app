@@ -5,6 +5,12 @@ use crate::domain::entities::*;
 use crate::domain::value_objects::*;
 
 #[derive(Debug, Error)]
+pub enum EmailError {
+    #[error("failed to send email: {0}")]
+    SendFailed(String),
+}
+
+#[derive(Debug, Error)]
 pub enum StoreError {
     #[error("connection failed: {0}")]
     Connection(String),
@@ -40,6 +46,25 @@ pub trait PricingStore: Send + Sync {
 pub trait UserStore: Send + Sync {
     async fn create_user(&self, user: &User) -> Result<(), StoreError>;
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, StoreError>;
+    async fn set_email_verified(&self, user_id: &UserId) -> Result<(), StoreError>;
+    async fn update_password(&self, user_id: &UserId, password_hash: &str) -> Result<(), StoreError>;
+    async fn find_by_id(&self, user_id: &UserId) -> Result<Option<User>, StoreError>;
+}
+
+#[async_trait]
+pub trait TokenStore: Send + Sync {
+    async fn store_token(&self, token: &VerificationToken) -> Result<(), StoreError>;
+    async fn find_valid_token(
+        &self,
+        token_hash: &str,
+        purpose: TokenPurpose,
+    ) -> Result<Option<VerificationToken>, StoreError>;
+    async fn mark_token_used(&self, token_hash: &str) -> Result<(), StoreError>;
+}
+
+#[async_trait]
+pub trait EmailSender: Send + Sync {
+    async fn send_email(&self, to: &str, subject: &str, html_body: &str) -> Result<(), EmailError>;
 }
 
 #[async_trait]

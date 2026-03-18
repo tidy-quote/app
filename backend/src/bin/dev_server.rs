@@ -5,15 +5,20 @@ use actix_cors::Cors;
 use actix_web::web::{self, Bytes, Data};
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 
-use tidy_quote_backend::application::use_cases::auth::{validate_token, AuthUseCase};
+use tidy_quote_backend::application::ports::{EmailSender, TokenStore, UserStore};
+use tidy_quote_backend::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
+use tidy_quote_backend::application::use_cases::email_verification;
 use tidy_quote_backend::application::use_cases::manage_pricing::ManagePricingUseCase;
+use tidy_quote_backend::application::use_cases::password_reset;
 use tidy_quote_backend::application::use_cases::process_lead::ProcessLeadUseCase;
 use tidy_quote_backend::domain::entities::*;
 use tidy_quote_backend::domain::value_objects::*;
 use tidy_quote_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
 use tidy_quote_backend::infrastructure::mongo_store::MongoStore;
+use tidy_quote_backend::infrastructure::ses_client::SesEmailClient;
 use tidy_quote_backend::presentation::handlers::{
-    AuthRequest, AuthResponse, AuthUserResponse, SavePricingRequest, SubmitLeadRequest,
+    AuthRequest, AuthResponse, AuthUserResponse, ForgotPasswordRequest, ResetPasswordRequest,
+    SavePricingRequest, SubmitLeadRequest, VerifyEmailRequest,
 };
 
 const DEV_SERVER_PORT: u16 = 3001;
@@ -21,6 +26,8 @@ const DEV_SERVER_PORT: u16 = 3001;
 struct AppState {
     store: MongoStore,
     ai_client: OpenAiCompatibleClient,
+    email_sender: SesEmailClient,
+    app_base_url: String,
 }
 
 fn extract_user_id(req: &HttpRequest) -> Result<UserId, HttpResponse> {
@@ -45,6 +52,15 @@ fn extract_user_id(req: &HttpRequest) -> Result<UserId, HttpResponse> {
     Ok(UserId::new(claims.sub))
 }
 
+fn check_email_verified_dev(user: &User) -> Result<(), HttpResponse> {
+    if !user.email_verified {
+        return Err(
+            HttpResponse::Forbidden().json(serde_json::json!({"error": "email_not_verified"}))
+        );
+    }
+    Ok(())
+}
+
 async fn signup(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
     let payload: AuthRequest = match serde_json::from_slice(&body) {
         Ok(p) => p,
@@ -57,14 +73,29 @@ async fn signup(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
     let use_case = AuthUseCase::new(&state.store);
 
     match use_case.signup(&payload.email, &payload.password).await {
-        Ok(result) => HttpResponse::Created().json(AuthResponse {
-            token: result.token,
-            user: AuthUserResponse {
-                id: result.user_id,
-                email: result.email,
-            },
-        }),
-        Err(tidy_quote_backend::application::use_cases::auth::AuthError::EmailTaken) => {
+        Ok(result) => {
+            let user_id = UserId::new(&result.user_id);
+            if let Err(e) = email_verification::send_verification_email(
+                &user_id,
+                &result.email,
+                &state.email_sender as &dyn EmailSender,
+                &state.store as &dyn TokenStore,
+                &state.app_base_url,
+            )
+            .await
+            {
+                eprintln!("Failed to send verification email: {e}");
+            }
+
+            HttpResponse::Created().json(AuthResponse {
+                token: result.token,
+                user: AuthUserResponse {
+                    id: result.user_id,
+                    email: result.email,
+                },
+            })
+        }
+        Err(AuthError::EmailTaken) => {
             HttpResponse::Conflict().json(serde_json::json!({"error": "email already registered"}))
         }
         Err(e) => {
@@ -92,8 +123,141 @@ async fn login(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
                 email: result.email,
             },
         }),
-        Err(tidy_quote_backend::application::use_cases::auth::AuthError::InvalidCredentials) => {
+        Err(AuthError::InvalidCredentials) => {
             HttpResponse::Unauthorized().json(serde_json::json!({"error": "invalid credentials"}))
+        }
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+async fn verify_email(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+    let payload: VerifyEmailRequest = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": format!("invalid JSON: {}", e)}))
+        }
+    };
+
+    match email_verification::verify_email(
+        &payload.token,
+        &state.store as &dyn UserStore,
+        &state.store as &dyn TokenStore,
+    )
+    .await
+    {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({"message": "email verified"})),
+        Err(email_verification::EmailVerificationError::InvalidToken) => {
+            HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "invalid or expired token"}))
+        }
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+async fn resend_verification(
+    req: HttpRequest,
+    state: Data<Arc<AppState>>,
+) -> HttpResponse {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    let user = match UserStore::find_by_id(&state.store, &user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "user not found"}))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+
+    if user.email_verified {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "email already verified"}));
+    }
+
+    match email_verification::send_verification_email(
+        &user_id,
+        &user.email,
+        &state.email_sender as &dyn EmailSender,
+        &state.store as &dyn TokenStore,
+        &state.app_base_url,
+    )
+    .await
+    {
+        Ok(()) => {
+            HttpResponse::Ok().json(serde_json::json!({"message": "verification email sent"}))
+        }
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+async fn forgot_password(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+    let payload: ForgotPasswordRequest = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": format!("invalid JSON: {}", e)}))
+        }
+    };
+
+    match password_reset::send_reset_email(
+        &payload.email,
+        &state.store as &dyn UserStore,
+        &state.email_sender as &dyn EmailSender,
+        &state.store as &dyn TokenStore,
+        &state.app_base_url,
+    )
+    .await
+    {
+        Ok(()) => HttpResponse::Ok().json(
+            serde_json::json!({"message": "if the email exists, a reset link has been sent"}),
+        ),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+async fn reset_password(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+    let payload: ResetPasswordRequest = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": format!("invalid JSON: {}", e)}))
+        }
+    };
+
+    match password_reset::reset_password(
+        &payload.token,
+        &payload.password,
+        &state.store as &dyn UserStore,
+        &state.store as &dyn TokenStore,
+    )
+    .await
+    {
+        Ok(()) => {
+            HttpResponse::Ok().json(serde_json::json!({"message": "password reset successful"}))
+        }
+        Err(password_reset::PasswordResetError::InvalidToken) => {
+            HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "invalid or expired token"}))
+        }
+        Err(password_reset::PasswordResetError::InvalidPassword) => {
+            HttpResponse::BadRequest().json(
+                serde_json::json!({"error": "password must be between 8 and 72 characters"}),
+            )
         }
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
@@ -106,6 +270,21 @@ async fn save_pricing(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes)
         Ok(id) => id,
         Err(r) => return r,
     };
+
+    let user = match UserStore::find_by_id(&state.store, &user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "user not found"}))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+    if let Err(r) = check_email_verified_dev(&user) {
+        return r;
+    }
 
     let payload: SavePricingRequest = match serde_json::from_slice(&body) {
         Ok(p) => p,
@@ -142,6 +321,21 @@ async fn get_pricing(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
         Err(r) => return r,
     };
 
+    let user = match UserStore::find_by_id(&state.store, &user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "user not found"}))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+    if let Err(r) = check_email_verified_dev(&user) {
+        return r;
+    }
+
     let use_case = ManagePricingUseCase::new(&state.store);
 
     match use_case.get_template(&user_id).await {
@@ -159,6 +353,21 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
         Ok(id) => id,
         Err(r) => return r,
     };
+
+    let user = match UserStore::find_by_id(&state.store, &user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "user not found"}))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+    if let Err(r) = check_email_verified_dev(&user) {
+        return r;
+    }
 
     let payload: SubmitLeadRequest = match serde_json::from_slice(&body) {
         Ok(p) => p,
@@ -198,6 +407,8 @@ async fn main() -> std::io::Result<()> {
     let ai_api_key = env::var("AI_API_KEY").expect("AI_API_KEY must be set");
     let ai_model =
         env::var("AI_MODEL").unwrap_or_else(|_| "google/gemini-3-flash-preview".to_string());
+    let ses_sender = env::var("SES_SENDER").expect("SES_SENDER must be set");
+    let app_base_url = env::var("APP_BASE_URL").expect("APP_BASE_URL must be set");
 
     let store = MongoStore::with_database(&mongo_uri, &mongo_db)
         .await
@@ -209,7 +420,14 @@ async fn main() -> std::io::Result<()> {
         model: ai_model,
     });
 
-    let state = Data::new(Arc::new(AppState { store, ai_client }));
+    let email_sender = SesEmailClient::new(ses_sender).await;
+
+    let state = Data::new(Arc::new(AppState {
+        store,
+        ai_client,
+        email_sender,
+        app_base_url,
+    }));
 
     println!("Tidy-Quote dev server running on http://localhost:{DEV_SERVER_PORT}");
 
@@ -227,6 +445,19 @@ async fn main() -> std::io::Result<()> {
             .app_data(state.clone())
             .route("/api/auth/signup", web::post().to(signup))
             .route("/api/auth/login", web::post().to(login))
+            .route("/api/auth/verify-email", web::post().to(verify_email))
+            .route(
+                "/api/auth/resend-verification",
+                web::post().to(resend_verification),
+            )
+            .route(
+                "/api/auth/forgot-password",
+                web::post().to(forgot_password),
+            )
+            .route(
+                "/api/auth/reset-password",
+                web::post().to(reset_password),
+            )
             .route("/api/pricing", web::post().to(save_pricing))
             .route("/api/pricing", web::get().to(get_pricing))
             .route("/api/quote", web::post().to(submit_lead))

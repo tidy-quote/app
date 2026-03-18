@@ -10,7 +10,25 @@ pub struct User {
     pub id: UserId,
     pub email: String,
     pub password_hash: String,
+    #[serde(default)]
+    pub email_verified: bool,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationToken {
+    pub user_id: UserId,
+    pub token_hash: String,
+    pub purpose: TokenPurpose,
+    pub expires_at: DateTime<Utc>,
+    pub used: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenPurpose {
+    EmailVerification,
+    PasswordReset,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

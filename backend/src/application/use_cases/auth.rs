@@ -65,6 +65,7 @@ impl<'a> AuthUseCase<'a> {
             id: UserId::generate(),
             email: email.to_string(),
             password_hash,
+            email_verified: false,
             created_at: Utc::now(),
         };
 

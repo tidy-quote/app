@@ -27,3 +27,8 @@ actix-cors = "0.7"
 jsonwebtoken = "9"
 bcrypt = "0.17"
 dotenv = "0.15"
+sha2 = "0.10"
+aws-config = "1"
+aws-sdk-sesv2 = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }

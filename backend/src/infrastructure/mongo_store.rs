@@ -1,18 +1,20 @@
 use async_trait::async_trait;
-use mongodb::bson::doc;
+use mongodb::bson::{self, doc};
 use mongodb::{Client, Collection, Database};
 
-use crate::application::ports::{PricingStore, StoreError, UserStore};
-use crate::domain::entities::{PricingTemplate, User};
+use crate::application::ports::{PricingStore, StoreError, TokenStore, UserStore};
+use crate::domain::entities::{PricingTemplate, TokenPurpose, User, VerificationToken};
 use crate::domain::value_objects::UserId;
 
 const DEFAULT_DB_NAME: &str = "tidy-quote";
 const COLLECTION_PRICING_TEMPLATES: &str = "pricing_templates";
 const COLLECTION_USERS: &str = "users";
+const COLLECTION_VERIFICATION_TOKENS: &str = "verification_tokens";
 
 pub struct MongoStore {
     pricing_collection: Collection<PricingTemplate>,
     users_collection: Collection<User>,
+    tokens_collection: Collection<VerificationToken>,
 }
 
 impl MongoStore {
@@ -32,12 +34,15 @@ impl MongoStore {
     async fn from_database(db: &Database) -> Result<Self, StoreError> {
         let pricing_collection = db.collection::<PricingTemplate>(COLLECTION_PRICING_TEMPLATES);
         let users_collection = db.collection::<User>(COLLECTION_USERS);
+        let tokens_collection =
+            db.collection::<VerificationToken>(COLLECTION_VERIFICATION_TOKENS);
 
         Self::ensure_user_indexes(&users_collection).await?;
 
         Ok(Self {
             pricing_collection,
             users_collection,
+            tokens_collection,
         })
     }
 
@@ -107,5 +112,87 @@ impl UserStore for MongoStore {
             .find_one(filter)
             .await
             .map_err(|e| StoreError::Internal(e.to_string()))
+    }
+
+    async fn set_email_verified(&self, user_id: &UserId) -> Result<(), StoreError> {
+        let filter = doc! { "id": user_id.as_str() };
+        let update = doc! { "$set": { "email_verified": true } };
+
+        self.users_collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn update_password(
+        &self,
+        user_id: &UserId,
+        password_hash: &str,
+    ) -> Result<(), StoreError> {
+        let filter = doc! { "id": user_id.as_str() };
+        let update = doc! { "$set": { "password_hash": password_hash } };
+
+        self.users_collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn find_by_id(&self, user_id: &UserId) -> Result<Option<User>, StoreError> {
+        let filter = doc! { "id": user_id.as_str() };
+
+        self.users_collection
+            .find_one(filter)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))
+    }
+}
+
+#[async_trait]
+impl TokenStore for MongoStore {
+    async fn store_token(&self, token: &VerificationToken) -> Result<(), StoreError> {
+        self.tokens_collection
+            .insert_one(token)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn find_valid_token(
+        &self,
+        token_hash: &str,
+        purpose: TokenPurpose,
+    ) -> Result<Option<VerificationToken>, StoreError> {
+        let purpose_bson =
+            bson::to_bson(&purpose).map_err(|e| StoreError::Serialization(e.to_string()))?;
+
+        let filter = doc! {
+            "token_hash": token_hash,
+            "purpose": purpose_bson,
+            "used": false,
+            "expires_at": { "$gt": bson::DateTime::now() },
+        };
+
+        self.tokens_collection
+            .find_one(filter)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))
+    }
+
+    async fn mark_token_used(&self, token_hash: &str) -> Result<(), StoreError> {
+        let filter = doc! { "token_hash": token_hash };
+        let update = doc! { "$set": { "used": true } };
+
+        self.tokens_collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
     }
 }
