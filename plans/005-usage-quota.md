@@ -1,6 +1,6 @@
 # ADR-005: Usage tracking and quota enforcement
 
-**Status**: in-progress
+**Status**: done
 **Date**: 2026-03-18
 
 ## Context

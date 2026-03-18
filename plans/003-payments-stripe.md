@@ -1,6 +1,6 @@
 # ADR-003: Payments & subscriptions with Stripe Checkout
 
-**Status**: accepted
+**Status**: done
 **Date**: 2026-03-18
 
 ## Context

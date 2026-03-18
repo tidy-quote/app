@@ -1,6 +1,6 @@
 # ADR-004: Persist and display quote history
 
-**Status**: in-progress
+**Status**: done
 **Date**: 2026-03-18
 
 ## Context
