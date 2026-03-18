@@ -1,15 +1,13 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../components/useAuth";
+import { Link } from "react-router-dom";
+import { forgotPassword } from "../../application/api";
 import "./AuthPages.css";
 
-export function LoginPage(): React.JSX.Element {
+export function ForgotPasswordPage(): React.JSX.Element {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
@@ -17,20 +15,39 @@ export function LoginPage(): React.JSX.Element {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate("/");
+      await forgotPassword(email);
+      setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (sent) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1 className="auth-logo">Tidy-Quote</h1>
+          <h2 className="auth-title">Check your email</h2>
+          <p className="auth-message">
+            If an account with that email exists, we sent a password reset link.
+          </p>
+          <p className="auth-switch">
+            <Link to="/login" className="auth-link">
+              Back to login
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="auth-page">
       <div className="auth-card">
         <h1 className="auth-logo">Tidy-Quote</h1>
-        <h2 className="auth-title">Log in to your account</h2>
+        <h2 className="auth-title">Reset your password</h2>
 
         {error && (
           <div className="error-banner" role="alert">
@@ -55,37 +72,14 @@ export function LoginPage(): React.JSX.Element {
             />
           </div>
 
-          <div className="auth-field">
-            <label className="form-label" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="current-password"
-            />
-          </div>
-
           <button type="submit" className="btn-primary auth-submit" disabled={loading}>
-            {loading ? "Logging in..." : "Log In"}
+            {loading ? "Sending..." : "Send reset link"}
           </button>
         </form>
 
         <p className="auth-switch">
-          <Link to="/forgot-password" className="auth-link">
-            Forgot password?
-          </Link>
-        </p>
-
-        <p className="auth-switch">
-          Don't have an account?{" "}
-          <Link to="/signup" className="auth-link">
-            Sign up
+          <Link to="/login" className="auth-link">
+            Back to login
           </Link>
         </p>
       </div>

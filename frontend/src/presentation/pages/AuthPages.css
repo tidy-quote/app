@@ -141,6 +141,26 @@
   color: var(--cl-amber);
 }
 
+.auth-message {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--cl-text-muted);
+  line-height: 1.6;
+  margin: 0 0 1.5rem;
+}
+
+.auth-page .success-banner {
+  padding: 0.75rem 1rem;
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  border: 1px solid var(--color-success-border);
+  border-radius: 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin-bottom: 1rem;
+  animation: fadeInUp 0.3s ease;
+}
+
 .auth-page .error-banner {
   padding: 0.75rem 1rem;
   background: var(--color-error-bg);

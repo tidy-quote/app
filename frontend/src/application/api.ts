@@ -130,6 +130,36 @@ export async function generateQuote(
   };
 }
 
+export async function verifyEmail(token: string): Promise<void> {
+  await request("/api/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function resendVerification(): Promise<void> {
+  await request("/api/auth/resend-verification", {
+    method: "POST",
+  });
+}
+
+export async function forgotPassword(email: string): Promise<void> {
+  await request("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(
+  token: string,
+  password: string
+): Promise<void> {
+  await request("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 function generateMockFollowUp(tone: ToneOption): string {
   switch (tone) {
     case "friendly":

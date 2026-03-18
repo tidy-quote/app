@@ -1,16 +1,17 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../components/useAuth";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import { resetPassword } from "../../application/api";
 import "./AuthPages.css";
 
-export function SignupPage(): React.JSX.Element {
-  const [email, setEmail] = useState("");
+export function ResetPasswordPage(): React.JSX.Element {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
+  const navigate = useNavigate();
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
-  const navigate = useNavigate();
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
@@ -24,20 +25,37 @@ export function SignupPage(): React.JSX.Element {
     setLoading(true);
 
     try {
-      await signup(email, password);
-      navigate("/verify");
+      await resetPassword(token, password);
+      navigate("/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed");
+      setError(err instanceof Error ? err.message : "Reset failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!token) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1 className="auth-logo">Tidy-Quote</h1>
+          <h2 className="auth-title">Invalid reset link</h2>
+          <p className="auth-message">This link is missing a reset token.</p>
+          <p className="auth-switch">
+            <Link to="/forgot-password" className="auth-link">
+              Request a new link
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="auth-page">
       <div className="auth-card">
         <h1 className="auth-logo">Tidy-Quote</h1>
-        <h2 className="auth-title">Create your account</h2>
+        <h2 className="auth-title">Set a new password</h2>
 
         {error && (
           <div className="error-banner" role="alert">
@@ -47,24 +65,8 @@ export function SignupPage(): React.JSX.Element {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-field">
-            <label className="form-label" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-              autoComplete="email"
-            />
-          </div>
-
-          <div className="auth-field">
             <label className="form-label" htmlFor="password">
-              Password
+              New password
             </label>
             <input
               id="password"
@@ -81,7 +83,7 @@ export function SignupPage(): React.JSX.Element {
 
           <div className="auth-field">
             <label className="form-label" htmlFor="confirm-password">
-              Confirm Password
+              Confirm password
             </label>
             <input
               id="confirm-password"
@@ -97,14 +99,13 @@ export function SignupPage(): React.JSX.Element {
           </div>
 
           <button type="submit" className="btn-primary auth-submit" disabled={loading}>
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading ? "Resetting..." : "Reset password"}
           </button>
         </form>
 
         <p className="auth-switch">
-          Already have an account?{" "}
           <Link to="/login" className="auth-link">
-            Log in
+            Back to login
           </Link>
         </p>
       </div>
