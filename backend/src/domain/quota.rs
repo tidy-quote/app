@@ -10,17 +10,30 @@ pub enum QuotaLimit {
     Unlimited,
 }
 
-/// Maps a Stripe price_id to its quota limit.
-///
-/// `allowed_price_ids` must be ordered: [starter, solo, pro].
-pub fn quota_for_price(price_id: &str, allowed_price_ids: &[String]) -> QuotaLimit {
-    if allowed_price_ids.len() >= 3 && price_id == allowed_price_ids[2] {
-        return QuotaLimit::Unlimited;
+/// Maps plan price IDs to their tier names for quota lookup.
+#[derive(Debug, Clone)]
+pub struct PlanConfig {
+    pub starter_price_id: String,
+    pub solo_price_id: String,
+    pub pro_price_id: String,
+}
+
+impl PlanConfig {
+    pub fn contains(&self, price_id: &str) -> bool {
+        price_id == self.starter_price_id
+            || price_id == self.solo_price_id
+            || price_id == self.pro_price_id
     }
-    if allowed_price_ids.len() >= 2 && price_id == allowed_price_ids[1] {
-        return QuotaLimit::Limited(SOLO_QUOTA);
+}
+
+pub fn quota_for_price(price_id: &str, plans: &PlanConfig) -> QuotaLimit {
+    if price_id == plans.pro_price_id {
+        QuotaLimit::Unlimited
+    } else if price_id == plans.solo_price_id {
+        QuotaLimit::Limited(SOLO_QUOTA)
+    } else {
+        QuotaLimit::Limited(STARTER_QUOTA)
     }
-    QuotaLimit::Limited(STARTER_QUOTA)
 }
 
 /// Returns (period_start, period_end) for the calendar month containing `now`.
@@ -46,43 +59,43 @@ pub fn current_billing_period(now: DateTime<Utc>) -> (DateTime<Utc>, DateTime<Ut
 mod tests {
     use super::*;
 
-    fn price_ids() -> Vec<String> {
-        vec![
-            "price_starter".to_string(),
-            "price_solo".to_string(),
-            "price_pro".to_string(),
-        ]
+    fn plan_config() -> PlanConfig {
+        PlanConfig {
+            starter_price_id: "price_starter".to_string(),
+            solo_price_id: "price_solo".to_string(),
+            pro_price_id: "price_pro".to_string(),
+        }
     }
 
     #[test]
     fn starter_plan_has_5_quota() {
-        let ids = price_ids();
+        let plans = plan_config();
         assert_eq!(
-            quota_for_price("price_starter", &ids),
+            quota_for_price("price_starter", &plans),
             QuotaLimit::Limited(STARTER_QUOTA)
         );
     }
 
     #[test]
     fn solo_plan_has_75_quota() {
-        let ids = price_ids();
+        let plans = plan_config();
         assert_eq!(
-            quota_for_price("price_solo", &ids),
+            quota_for_price("price_solo", &plans),
             QuotaLimit::Limited(SOLO_QUOTA)
         );
     }
 
     #[test]
     fn pro_plan_is_unlimited() {
-        let ids = price_ids();
-        assert_eq!(quota_for_price("price_pro", &ids), QuotaLimit::Unlimited);
+        let plans = plan_config();
+        assert_eq!(quota_for_price("price_pro", &plans), QuotaLimit::Unlimited);
     }
 
     #[test]
     fn unknown_price_id_defaults_to_starter() {
-        let ids = price_ids();
+        let plans = plan_config();
         assert_eq!(
-            quota_for_price("price_unknown", &ids),
+            quota_for_price("price_unknown", &plans),
             QuotaLimit::Limited(STARTER_QUOTA)
         );
     }

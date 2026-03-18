@@ -3,7 +3,7 @@ use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use tracing::error;
 
-use crate::application::ports::{PaymentError, PaymentProvider, StripeEvent};
+use crate::application::ports::{BillingEvent, PaymentError, PaymentProvider};
 
 const STRIPE_API_BASE: &str = "https://api.stripe.com/v1";
 const WEBHOOK_TOLERANCE_SECONDS: i64 = 300;
@@ -77,7 +77,7 @@ impl PaymentProvider for StripeClient {
         &self,
         payload: &str,
         signature: &str,
-    ) -> Result<StripeEvent, PaymentError> {
+    ) -> Result<BillingEvent, PaymentError> {
         let (timestamp, sig) = parse_stripe_signature(signature)?;
 
         let now = chrono::Utc::now().timestamp();
@@ -132,7 +132,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
         == 0
 }
 
-fn parse_event_json(payload: &str) -> Result<StripeEvent, PaymentError> {
+fn parse_event_json(payload: &str) -> Result<BillingEvent, PaymentError> {
     let json: serde_json::Value =
         serde_json::from_str(payload).map_err(|e| PaymentError::ProviderError(e.to_string()))?;
 
@@ -140,7 +140,7 @@ fn parse_event_json(payload: &str) -> Result<StripeEvent, PaymentError> {
 
     let data_object = &json["data"]["object"];
 
-    let customer_id = data_object["customer"].as_str().map(|s| s.to_string());
+    let provider_customer_id = data_object["customer"].as_str().map(|s| s.to_string());
 
     let customer_email = data_object["customer_email"]
         .as_str()
@@ -149,17 +149,17 @@ fn parse_event_json(payload: &str) -> Result<StripeEvent, PaymentError> {
 
     let subscription_status = data_object["status"].as_str().map(|s| s.to_string());
 
-    let price_id = data_object["items"]["data"][0]["price"]["id"]
+    let plan_id = data_object["items"]["data"][0]["price"]["id"]
         .as_str()
         .or_else(|| data_object["plan"]["id"].as_str())
         .map(|s| s.to_string());
 
-    Ok(StripeEvent {
+    Ok(BillingEvent {
         event_type,
-        customer_id,
+        provider_customer_id,
         customer_email,
         subscription_status,
-        price_id,
+        plan_id,
     })
 }
 
@@ -188,7 +188,7 @@ mod tests {
         assert!(event.is_ok());
         let event = event.unwrap();
         assert_eq!(event.event_type, "checkout.session.completed");
-        assert_eq!(event.customer_id.as_deref(), Some("cus_123"));
+        assert_eq!(event.provider_customer_id.as_deref(), Some("cus_123"));
     }
 
     #[test]

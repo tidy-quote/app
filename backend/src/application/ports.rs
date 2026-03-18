@@ -13,12 +13,12 @@ pub enum PaymentError {
     InvalidSignature,
 }
 
-pub struct StripeEvent {
+pub struct BillingEvent {
     pub event_type: String,
-    pub customer_id: Option<String>,
+    pub provider_customer_id: Option<String>,
     pub customer_email: Option<String>,
     pub subscription_status: Option<String>,
-    pub price_id: Option<String>,
+    pub plan_id: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -72,14 +72,18 @@ pub trait UserStore: Send + Sync {
         password_hash: &str,
     ) -> Result<(), StoreError>;
     async fn find_by_id(&self, user_id: &UserId) -> Result<Option<User>, StoreError>;
+}
+
+#[async_trait]
+pub trait SubscriptionStore: Send + Sync {
     async fn update_subscription(
         &self,
         user_id: &UserId,
-        stripe_customer_id: &str,
+        provider_customer_id: &str,
         status: SubscriptionStatus,
         plan: Option<String>,
     ) -> Result<(), StoreError>;
-    async fn find_by_stripe_customer_id(
+    async fn find_by_provider_customer_id(
         &self,
         customer_id: &str,
     ) -> Result<Option<User>, StoreError>;
@@ -168,5 +172,5 @@ pub trait PaymentProvider: Send + Sync {
         &self,
         payload: &str,
         signature: &str,
-    ) -> Result<StripeEvent, PaymentError>;
+    ) -> Result<BillingEvent, PaymentError>;
 }

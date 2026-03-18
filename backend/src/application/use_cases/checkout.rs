@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use crate::application::ports::{PaymentProvider, UserStore};
+use crate::domain::quota::PlanConfig;
 use crate::domain::value_objects::UserId;
 
 #[derive(Debug, Error)]
@@ -21,9 +22,9 @@ pub async fn create_checkout(
     user_store: &dyn UserStore,
     payment_provider: &dyn PaymentProvider,
     app_base_url: &str,
-    allowed_price_ids: &[String],
+    plan_config: &PlanConfig,
 ) -> Result<String, CheckoutError> {
-    if !allowed_price_ids.iter().any(|p| p == price_id) {
+    if !plan_config.contains(price_id) {
         return Err(CheckoutError::InvalidPriceId);
     }
 

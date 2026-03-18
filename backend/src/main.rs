@@ -5,6 +5,7 @@ use lambda_http::{run, service_fn, Body, Request, Response};
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter};
 
+use tidy_quote_backend::domain::quota::PlanConfig;
 use tidy_quote_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
 use tidy_quote_backend::infrastructure::mongo_store::MongoStore;
 use tidy_quote_backend::infrastructure::ses_client::SesEmailClient;
@@ -17,7 +18,8 @@ struct AppState {
     email_sender: SesEmailClient,
     stripe_client: StripeClient,
     app_base_url: String,
-    allowed_price_ids: Vec<String>,
+    plan_config: PlanConfig,
+    jwt_secret: String,
 }
 
 async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, lambda_http::Error> {
@@ -42,10 +44,13 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
                 &state.email_sender,
                 &state.store,
                 &state.app_base_url,
+                &state.jwt_secret,
             )
             .await
         }
-        ("POST", "/api/auth/login") => handlers::handle_login(req, &state.store).await,
+        ("POST", "/api/auth/login") => {
+            handlers::handle_login(req, &state.store, &state.jwt_secret).await
+        }
         ("POST", "/api/auth/verify-email") => {
             handlers::handle_verify_email(req, &state.store, &state.store).await
         }
@@ -56,6 +61,7 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
                 &state.email_sender,
                 &state.store,
                 &state.app_base_url,
+                &state.jwt_secret,
             )
             .await
         }
@@ -73,10 +79,10 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
             handlers::handle_reset_password(req, &state.store, &state.store).await
         }
         ("POST", "/api/pricing") => {
-            handlers::handle_save_pricing(req, &state.store, &state.store).await
+            handlers::handle_save_pricing(req, &state.store, &state.store, &state.jwt_secret).await
         }
         ("GET", "/api/pricing") => {
-            handlers::handle_get_pricing(req, &state.store, &state.store).await
+            handlers::handle_get_pricing(req, &state.store, &state.store, &state.jwt_secret).await
         }
         ("POST", "/api/quote") => {
             handlers::handle_submit_lead(
@@ -86,17 +92,26 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
                 &state.store,
                 &state.store,
                 &state.store,
-                &state.allowed_price_ids,
+                &state.plan_config,
+                &state.jwt_secret,
             )
             .await
         }
         ("GET", "/api/usage") => {
-            handlers::handle_get_usage(req, &state.store, &state.store, &state.allowed_price_ids)
-                .await
+            handlers::handle_get_usage(
+                req,
+                &state.store,
+                &state.store,
+                &state.plan_config,
+                &state.jwt_secret,
+            )
+            .await
         }
-        ("GET", "/api/subscription") => handlers::handle_get_subscription(req, &state.store).await,
+        ("GET", "/api/subscription") => {
+            handlers::handle_get_subscription(req, &state.store, &state.jwt_secret).await
+        }
         ("GET", "/api/quotes") => {
-            handlers::handle_list_quotes(req, &state.store, &state.store).await
+            handlers::handle_list_quotes(req, &state.store, &state.store, &state.jwt_secret).await
         }
         ("POST", "/api/checkout") => {
             handlers::handle_checkout(
@@ -104,16 +119,19 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
                 &state.store,
                 &state.stripe_client,
                 &state.app_base_url,
-                &state.allowed_price_ids,
+                &state.plan_config,
+                &state.jwt_secret,
             )
             .await
         }
         ("POST", "/api/webhook/stripe") => {
-            handlers::handle_stripe_webhook(req, &state.stripe_client, &state.store).await
+            handlers::handle_stripe_webhook(req, &state.stripe_client, &state.store, &state.store)
+                .await
         }
         ("GET", path) if path.starts_with("/api/quotes/") => {
             let quote_id = &path["/api/quotes/".len()..];
-            handlers::handle_get_quote(req, quote_id, &state.store, &state.store).await
+            handlers::handle_get_quote(req, quote_id, &state.store, &state.store, &state.jwt_secret)
+                .await
         }
         _ => Response::builder()
             .status(404)
@@ -145,6 +163,7 @@ async fn main() -> Result<(), lambda_http::Error> {
     let stripe_secret_key = env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY must be set");
     let stripe_webhook_secret =
         env::var("STRIPE_WEBHOOK_SECRET").expect("STRIPE_WEBHOOK_SECRET must be set");
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let stripe_price_starter =
         env::var("STRIPE_PRICE_STARTER").expect("STRIPE_PRICE_STARTER must be set");
     let stripe_price_solo = env::var("STRIPE_PRICE_SOLO").expect("STRIPE_PRICE_SOLO must be set");
@@ -162,7 +181,11 @@ async fn main() -> Result<(), lambda_http::Error> {
 
     let email_sender = SesEmailClient::new(ses_sender).await;
     let stripe_client = StripeClient::new(stripe_secret_key, stripe_webhook_secret);
-    let allowed_price_ids = vec![stripe_price_starter, stripe_price_solo, stripe_price_pro];
+    let plan_config = PlanConfig {
+        starter_price_id: stripe_price_starter,
+        solo_price_id: stripe_price_solo,
+        pro_price_id: stripe_price_pro,
+    };
 
     let state = Arc::new(AppState {
         store,
@@ -170,7 +193,8 @@ async fn main() -> Result<(), lambda_http::Error> {
         email_sender,
         stripe_client,
         app_base_url,
-        allowed_price_ids,
+        plan_config,
+        jwt_secret,
     });
 
     run(service_fn(move |req: Request| {

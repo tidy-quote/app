@@ -1,7 +1,7 @@
 use thiserror::Error;
 use tracing::{error, info};
 
-use crate::application::ports::{PaymentProvider, UserStore};
+use crate::application::ports::{PaymentProvider, SubscriptionStore, UserStore};
 use crate::domain::entities::SubscriptionStatus;
 
 #[derive(Debug, Error)]
@@ -21,6 +21,7 @@ pub async fn handle_stripe_webhook(
     signature: &str,
     payment_provider: &dyn PaymentProvider,
     user_store: &dyn UserStore,
+    subscription_store: &dyn SubscriptionStore,
 ) -> Result<(), WebhookError> {
     let event = payment_provider
         .verify_webhook_signature(payload, signature)
@@ -36,9 +37,9 @@ pub async fn handle_stripe_webhook(
                 .ok_or_else(|| WebhookError::MissingField("customer_email".into()))?;
 
             let customer_id = event
-                .customer_id
+                .provider_customer_id
                 .as_deref()
-                .ok_or_else(|| WebhookError::MissingField("customer_id".into()))?;
+                .ok_or_else(|| WebhookError::MissingField("provider_customer_id".into()))?;
 
             let user = user_store
                 .find_by_email(email)
@@ -49,15 +50,15 @@ pub async fn handle_stripe_webhook(
                     WebhookError::Internal(format!("no user found for email {email}"))
                 })?;
 
-            // Use Stripe's reported subscription status if available,
+            // Use the provider's reported subscription status if available,
             // rather than blindly assuming active (covers deferred payments like ACH/SEPA)
             let status = match event.subscription_status.as_deref() {
                 Some(s) => map_stripe_status(Some(s)),
                 None => SubscriptionStatus::Active,
             };
 
-            user_store
-                .update_subscription(&user.id, customer_id, status, event.price_id)
+            subscription_store
+                .update_subscription(&user.id, customer_id, status, event.plan_id)
                 .await
                 .map_err(|e| WebhookError::Internal(e.to_string()))?;
 
@@ -65,12 +66,12 @@ pub async fn handle_stripe_webhook(
         }
         "customer.subscription.updated" => {
             let customer_id = event
-                .customer_id
+                .provider_customer_id
                 .as_deref()
-                .ok_or_else(|| WebhookError::MissingField("customer_id".into()))?;
+                .ok_or_else(|| WebhookError::MissingField("provider_customer_id".into()))?;
 
-            let user = user_store
-                .find_by_stripe_customer_id(customer_id)
+            let user = subscription_store
+                .find_by_provider_customer_id(customer_id)
                 .await
                 .map_err(|e| WebhookError::Internal(e.to_string()))?
                 .ok_or_else(|| {
@@ -80,8 +81,8 @@ pub async fn handle_stripe_webhook(
 
             let status = map_stripe_status(event.subscription_status.as_deref());
 
-            user_store
-                .update_subscription(&user.id, customer_id, status, event.price_id)
+            subscription_store
+                .update_subscription(&user.id, customer_id, status, event.plan_id)
                 .await
                 .map_err(|e| WebhookError::Internal(e.to_string()))?;
 
@@ -89,12 +90,12 @@ pub async fn handle_stripe_webhook(
         }
         "customer.subscription.deleted" => {
             let customer_id = event
-                .customer_id
+                .provider_customer_id
                 .as_deref()
-                .ok_or_else(|| WebhookError::MissingField("customer_id".into()))?;
+                .ok_or_else(|| WebhookError::MissingField("provider_customer_id".into()))?;
 
-            let user = user_store
-                .find_by_stripe_customer_id(customer_id)
+            let user = subscription_store
+                .find_by_provider_customer_id(customer_id)
                 .await
                 .map_err(|e| WebhookError::Internal(e.to_string()))?
                 .ok_or_else(|| {
@@ -102,7 +103,7 @@ pub async fn handle_stripe_webhook(
                     WebhookError::Internal(format!("no user for customer {customer_id}"))
                 })?;
 
-            user_store
+            subscription_store
                 .update_subscription(&user.id, customer_id, SubscriptionStatus::Cancelled, None)
                 .await
                 .map_err(|e| WebhookError::Internal(e.to_string()))?;

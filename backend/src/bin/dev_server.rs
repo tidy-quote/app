@@ -6,7 +6,7 @@ use actix_web::web::{self, Bytes, Data};
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 
 use tidy_quote_backend::application::ports::{
-    EmailSender, PaymentProvider, QuoteStore, TokenStore, UsageStore, UserStore,
+    EmailSender, PaymentProvider, QuoteStore, SubscriptionStore, TokenStore, UsageStore, UserStore,
 };
 use tidy_quote_backend::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
 use tidy_quote_backend::application::use_cases::checkout::{self, CheckoutError};
@@ -18,7 +18,9 @@ use tidy_quote_backend::application::use_cases::process_lead::{
 };
 use tidy_quote_backend::application::use_cases::webhook;
 use tidy_quote_backend::domain::entities::*;
-use tidy_quote_backend::domain::quota::{current_billing_period, quota_for_price, QuotaLimit};
+use tidy_quote_backend::domain::quota::{
+    current_billing_period, quota_for_price, PlanConfig, QuotaLimit,
+};
 use tidy_quote_backend::domain::value_objects::*;
 use tidy_quote_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
 use tidy_quote_backend::infrastructure::mongo_store::MongoStore;
@@ -37,10 +39,11 @@ struct AppState {
     email_sender: SesEmailClient,
     stripe_client: StripeClient,
     app_base_url: String,
-    allowed_price_ids: Vec<String>,
+    plan_config: PlanConfig,
+    jwt_secret: String,
 }
 
-fn extract_user_id(req: &HttpRequest) -> Result<UserId, HttpResponse> {
+fn extract_user_id(req: &HttpRequest, jwt_secret: &str) -> Result<UserId, HttpResponse> {
     let auth_header = req
         .headers()
         .get("Authorization")
@@ -55,7 +58,7 @@ fn extract_user_id(req: &HttpRequest) -> Result<UserId, HttpResponse> {
             .json(serde_json::json!({"error": "invalid Authorization header format"}))
     })?;
 
-    let claims = validate_token(token).map_err(|_| {
+    let claims = validate_token(token, jwt_secret).map_err(|_| {
         HttpResponse::Unauthorized().json(serde_json::json!({"error": "invalid or expired token"}))
     })?;
 
@@ -89,7 +92,7 @@ async fn signup(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
         }
     };
 
-    let use_case = AuthUseCase::new(&state.store);
+    let use_case = AuthUseCase::new(&state.store, &state.jwt_secret);
 
     match use_case.signup(&payload.email, &payload.password).await {
         Ok(result) => {
@@ -117,9 +120,13 @@ async fn signup(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
         Err(AuthError::EmailTaken) => {
             HttpResponse::Conflict().json(serde_json::json!({"error": "email already registered"}))
         }
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        Err(AuthError::InvalidEmail) => {
+            HttpResponse::BadRequest().json(serde_json::json!({"error": "invalid email format"}))
         }
+        Err(AuthError::InvalidPassword) => HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "password must be between 8 and 72 characters"})),
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -132,7 +139,7 @@ async fn login(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
         }
     };
 
-    let use_case = AuthUseCase::new(&state.store);
+    let use_case = AuthUseCase::new(&state.store, &state.jwt_secret);
 
     match use_case.login(&payload.email, &payload.password).await {
         Ok(result) => HttpResponse::Ok().json(AuthResponse {
@@ -145,9 +152,8 @@ async fn login(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
         Err(AuthError::InvalidCredentials) => {
             HttpResponse::Unauthorized().json(serde_json::json!({"error": "invalid credentials"}))
         }
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -170,14 +176,13 @@ async fn verify_email(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
         Ok(()) => HttpResponse::Ok().json(serde_json::json!({"message": "email verified"})),
         Err(email_verification::EmailVerificationError::InvalidToken) => HttpResponse::BadRequest()
             .json(serde_json::json!({"error": "invalid or expired token"})),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
 async fn resend_verification(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -188,9 +193,9 @@ async fn resend_verification(req: HttpRequest, state: Data<Arc<AppState>>) -> Ht
             return HttpResponse::Unauthorized()
                 .json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
+        Err(_) => {
             return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"error": e.to_string()}))
+                .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
 
@@ -211,9 +216,8 @@ async fn resend_verification(req: HttpRequest, state: Data<Arc<AppState>>) -> Ht
         Ok(()) => {
             HttpResponse::Ok().json(serde_json::json!({"message": "verification email sent"}))
         }
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -238,9 +242,8 @@ async fn forgot_password(state: Data<Arc<AppState>>, body: Bytes) -> HttpRespons
         Ok(()) => HttpResponse::Ok().json(
             serde_json::json!({"message": "if the email exists, a reset link has been sent"}),
         ),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -268,14 +271,13 @@ async fn reset_password(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse
             .json(serde_json::json!({"error": "invalid or expired token"})),
         Err(password_reset::PasswordResetError::InvalidPassword) => HttpResponse::BadRequest()
             .json(serde_json::json!({"error": "password must be between 8 and 72 characters"})),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
 async fn save_pricing(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -286,9 +288,9 @@ async fn save_pricing(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes)
             return HttpResponse::Unauthorized()
                 .json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
+        Err(_e) => {
             return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"error": e.to_string()}))
+                .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
     if let Err(r) = check_email_verified_dev(&user) {
@@ -321,14 +323,13 @@ async fn save_pricing(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes)
         .await
     {
         Ok(template) => HttpResponse::Ok().json(template),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
 async fn get_pricing(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -339,9 +340,9 @@ async fn get_pricing(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
             return HttpResponse::Unauthorized()
                 .json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
+        Err(_e) => {
             return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"error": e.to_string()}))
+                .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
     if let Err(r) = check_email_verified_dev(&user) {
@@ -357,14 +358,13 @@ async fn get_pricing(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
         Ok(Some(template)) => HttpResponse::Ok().json(template),
         Ok(None) => HttpResponse::NotFound()
             .json(serde_json::json!({"error": "pricing template not found"})),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
 async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -375,9 +375,9 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
             return HttpResponse::Unauthorized()
                 .json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
+        Err(_e) => {
             return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"error": e.to_string()}))
+                .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
     if let Err(r) = check_email_verified_dev(&user) {
@@ -409,7 +409,7 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
         &state.store,
         &state.store as &dyn UsageStore,
         &state.store as &dyn UserStore,
-        &state.allowed_price_ids,
+        &state.plan_config,
     );
 
     match use_case.execute(&lead, payload.tone).await {
@@ -420,9 +420,8 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
                 "used": used,
                 "limit": limit,
             })),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -431,7 +430,7 @@ const DEFAULT_LIMIT: u32 = 20;
 const MAX_LIMIT: u32 = 100;
 
 async fn list_quotes(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -442,9 +441,9 @@ async fn list_quotes(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
             return HttpResponse::Unauthorized()
                 .json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
+        Err(_e) => {
             return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"error": e.to_string()}))
+                .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
     if let Err(r) = check_email_verified_dev(&user) {
@@ -475,9 +474,8 @@ async fn list_quotes(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
 
     match QuoteStore::list_quotes(&state.store, &user_id, page, limit).await {
         Ok(quotes) => HttpResponse::Ok().json(quotes),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -486,7 +484,7 @@ async fn get_quote(
     state: Data<Arc<AppState>>,
     path: web::Path<String>,
 ) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -497,9 +495,9 @@ async fn get_quote(
             return HttpResponse::Unauthorized()
                 .json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
+        Err(_e) => {
             return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"error": e.to_string()}))
+                .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
     if let Err(r) = check_email_verified_dev(&user) {
@@ -514,14 +512,13 @@ async fn get_quote(
     match QuoteStore::get_quote(&state.store, &quote_id, &user_id).await {
         Ok(Some(quote)) => HttpResponse::Ok().json(quote),
         Ok(None) => HttpResponse::NotFound().json(serde_json::json!({"error": "quote not found"})),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
 async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -532,9 +529,9 @@ async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse
             return HttpResponse::Unauthorized()
                 .json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
+        Err(_e) => {
             return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"error": e.to_string()}))
+                .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
     if let Err(r) = check_email_verified_dev(&user) {
@@ -545,7 +542,7 @@ async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse
     }
 
     let price_id = user.subscription_plan.as_deref().unwrap_or("");
-    let limit = quota_for_price(price_id, &state.allowed_price_ids);
+    let limit = quota_for_price(price_id, &state.plan_config);
 
     let now = chrono::Utc::now();
     let (period_start, period_end) = current_billing_period(now);
@@ -555,9 +552,9 @@ async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse
             .await
         {
             Ok(u) => u,
-            Err(e) => {
+            Err(_e) => {
                 return HttpResponse::InternalServerError()
-                    .json(serde_json::json!({"error": e.to_string()}))
+                    .json(serde_json::json!({"error": "an internal error occurred"}))
             }
         };
 
@@ -578,7 +575,7 @@ async fn create_checkout(
     state: Data<Arc<AppState>>,
     body: Bytes,
 ) -> HttpResponse {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, &state.jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -597,7 +594,7 @@ async fn create_checkout(
         &state.store as &dyn UserStore,
         &state.stripe_client as &dyn PaymentProvider,
         &state.app_base_url,
-        &state.allowed_price_ids,
+        &state.plan_config,
     )
     .await
     {
@@ -608,9 +605,8 @@ async fn create_checkout(
         Err(CheckoutError::UserNotFound) => {
             HttpResponse::NotFound().json(serde_json::json!({"error": "user not found"}))
         }
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -634,15 +630,15 @@ async fn stripe_webhook(req: HttpRequest, state: Data<Arc<AppState>>, body: Byte
         &signature,
         &state.stripe_client as &dyn PaymentProvider,
         &state.store as &dyn UserStore,
+        &state.store as &dyn SubscriptionStore,
     )
     .await
     {
         Ok(()) => HttpResponse::Ok().json(serde_json::json!({"received": true})),
         Err(webhook::WebhookError::InvalidSignature) => HttpResponse::BadRequest()
             .json(serde_json::json!({"error": "invalid webhook signature"})),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
-        }
+        Err(_e) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "an internal error occurred"})),
     }
 }
 
@@ -663,6 +659,7 @@ async fn main() -> std::io::Result<()> {
     let stripe_secret_key = env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY must be set");
     let stripe_webhook_secret =
         env::var("STRIPE_WEBHOOK_SECRET").expect("STRIPE_WEBHOOK_SECRET must be set");
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let stripe_price_starter =
         env::var("STRIPE_PRICE_STARTER").expect("STRIPE_PRICE_STARTER must be set");
     let stripe_price_solo = env::var("STRIPE_PRICE_SOLO").expect("STRIPE_PRICE_SOLO must be set");
@@ -680,7 +677,11 @@ async fn main() -> std::io::Result<()> {
 
     let email_sender = SesEmailClient::new(ses_sender).await;
     let stripe_client = StripeClient::new(stripe_secret_key, stripe_webhook_secret);
-    let allowed_price_ids = vec![stripe_price_starter, stripe_price_solo, stripe_price_pro];
+    let plan_config = PlanConfig {
+        starter_price_id: stripe_price_starter,
+        solo_price_id: stripe_price_solo,
+        pro_price_id: stripe_price_pro,
+    };
 
     let state = Data::new(Arc::new(AppState {
         store,
@@ -688,7 +689,8 @@ async fn main() -> std::io::Result<()> {
         email_sender,
         stripe_client,
         app_base_url,
-        allowed_price_ids,
+        plan_config,
+        jwt_secret,
     }));
 
     println!("Tidy-Quote dev server running on http://localhost:{DEV_SERVER_PORT}");

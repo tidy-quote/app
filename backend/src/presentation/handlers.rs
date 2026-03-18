@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
 use crate::application::ports::{
-    AiClient, EmailSender, PaymentProvider, PricingStore, QuoteStore, TokenStore, UsageStore,
-    UserStore,
+    AiClient, EmailSender, PaymentProvider, PricingStore, QuoteStore, SubscriptionStore,
+    TokenStore, UsageStore, UserStore,
 };
 use crate::application::use_cases::auth::{validate_token, AuthError, AuthUseCase, Claims};
 use crate::application::use_cases::checkout::{self, CheckoutError};
@@ -14,7 +14,7 @@ use crate::application::use_cases::password_reset;
 use crate::application::use_cases::process_lead::{ProcessLeadError, ProcessLeadUseCase};
 use crate::application::use_cases::webhook;
 use crate::domain::entities::*;
-use crate::domain::quota::{current_billing_period, quota_for_price, QuotaLimit};
+use crate::domain::quota::{current_billing_period, quota_for_price, PlanConfig, QuotaLimit};
 use crate::domain::value_objects::*;
 use crate::presentation::validation;
 
@@ -113,7 +113,10 @@ fn parse_body(req: &Request) -> Result<String, Response<Body>> {
 }
 
 #[allow(clippy::result_large_err)]
-pub fn extract_user_id_and_claims(req: &Request) -> Result<(UserId, Claims), Response<Body>> {
+pub fn extract_user_id_and_claims(
+    req: &Request,
+    jwt_secret: &str,
+) -> Result<(UserId, Claims), Response<Body>> {
     let auth_header = req
         .headers()
         .get("Authorization")
@@ -124,16 +127,16 @@ pub fn extract_user_id_and_claims(req: &Request) -> Result<(UserId, Claims), Res
         .strip_prefix("Bearer ")
         .ok_or_else(|| error_response(401, "invalid Authorization header format"))?;
 
-    let claims =
-        validate_token(token).map_err(|_| error_response(401, "invalid or expired token"))?;
+    let claims = validate_token(token, jwt_secret)
+        .map_err(|_| error_response(401, "invalid or expired token"))?;
 
     let user_id = UserId::new(claims.sub.clone());
     Ok((user_id, claims))
 }
 
 #[allow(clippy::result_large_err)]
-pub fn extract_user_id(req: &Request) -> Result<UserId, Response<Body>> {
-    extract_user_id_and_claims(req).map(|(id, _)| id)
+pub fn extract_user_id(req: &Request, jwt_secret: &str) -> Result<UserId, Response<Body>> {
+    extract_user_id_and_claims(req, jwt_secret).map(|(id, _)| id)
 }
 
 pub async fn handle_signup(
@@ -142,6 +145,7 @@ pub async fn handle_signup(
     email_sender: &dyn EmailSender,
     token_store: &dyn TokenStore,
     app_base_url: &str,
+    jwt_secret: &str,
 ) -> Response<Body> {
     let body = match parse_body(&req) {
         Ok(b) => b,
@@ -157,7 +161,7 @@ pub async fn handle_signup(
         return error_response(400, &msg);
     }
 
-    let use_case = AuthUseCase::new(user_store);
+    let use_case = AuthUseCase::new(user_store, jwt_secret);
 
     match use_case.signup(&payload.email, &payload.password).await {
         Ok(result) => {
@@ -199,7 +203,11 @@ pub async fn handle_signup(
     }
 }
 
-pub async fn handle_login(req: Request, user_store: &dyn UserStore) -> Response<Body> {
+pub async fn handle_login(
+    req: Request,
+    user_store: &dyn UserStore,
+    jwt_secret: &str,
+) -> Response<Body> {
     let body = match parse_body(&req) {
         Ok(b) => b,
         Err(r) => return r,
@@ -214,7 +222,7 @@ pub async fn handle_login(req: Request, user_store: &dyn UserStore) -> Response<
         return error_response(400, &msg);
     }
 
-    let use_case = AuthUseCase::new(user_store);
+    let use_case = AuthUseCase::new(user_store, jwt_secret);
 
     match use_case.login(&payload.email, &payload.password).await {
         Ok(result) => {
@@ -292,8 +300,9 @@ pub async fn handle_save_pricing(
     req: Request,
     store: &dyn PricingStore,
     user_store: &dyn UserStore,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+    let (user_id, claims) = match extract_user_id_and_claims(&req, jwt_secret) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -346,8 +355,9 @@ pub async fn handle_get_pricing(
     req: Request,
     store: &dyn PricingStore,
     user_store: &dyn UserStore,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+    let (user_id, claims) = match extract_user_id_and_claims(&req, jwt_secret) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -372,6 +382,7 @@ pub async fn handle_get_pricing(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn handle_submit_lead(
     req: Request,
     store: &dyn PricingStore,
@@ -379,9 +390,10 @@ pub async fn handle_submit_lead(
     user_store: &dyn UserStore,
     quote_store: &dyn QuoteStore,
     usage_store: &dyn UsageStore,
-    allowed_price_ids: &[String],
+    plan_config: &PlanConfig,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+    let (user_id, claims) = match extract_user_id_and_claims(&req, jwt_secret) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -422,7 +434,7 @@ pub async fn handle_submit_lead(
         quote_store,
         usage_store,
         user_store,
-        allowed_price_ids,
+        plan_config,
     );
 
     match use_case.execute(&lead, payload.tone).await {
@@ -482,8 +494,9 @@ pub async fn handle_resend_verification(
     email_sender: &dyn EmailSender,
     token_store: &dyn TokenStore,
     app_base_url: &str,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -598,9 +611,10 @@ pub async fn handle_checkout(
     user_store: &dyn UserStore,
     payment_provider: &dyn PaymentProvider,
     app_base_url: &str,
-    allowed_price_ids: &[String],
+    plan_config: &PlanConfig,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
+    let user_id = match extract_user_id(&req, jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };
@@ -621,7 +635,7 @@ pub async fn handle_checkout(
         user_store,
         payment_provider,
         app_base_url,
-        allowed_price_ids,
+        plan_config,
     )
     .await
     {
@@ -643,8 +657,9 @@ pub async fn handle_list_quotes(
     req: Request,
     quote_store: &dyn QuoteStore,
     user_store: &dyn UserStore,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+    let (user_id, claims) = match extract_user_id_and_claims(&req, jwt_secret) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -693,8 +708,9 @@ pub async fn handle_get_quote(
     quote_id: &str,
     quote_store: &dyn QuoteStore,
     user_store: &dyn UserStore,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+    let (user_id, claims) = match extract_user_id_and_claims(&req, jwt_secret) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -726,9 +742,10 @@ pub async fn handle_get_usage(
     req: Request,
     user_store: &dyn UserStore,
     usage_store: &dyn UsageStore,
-    allowed_price_ids: &[String],
+    plan_config: &PlanConfig,
+    jwt_secret: &str,
 ) -> Response<Body> {
-    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+    let (user_id, claims) = match extract_user_id_and_claims(&req, jwt_secret) {
         Ok(v) => v,
         Err(r) => return r,
     };
@@ -751,7 +768,7 @@ pub async fn handle_get_usage(
     };
 
     let price_id = user.subscription_plan.as_deref().unwrap_or("");
-    let limit = quota_for_price(price_id, allowed_price_ids);
+    let limit = quota_for_price(price_id, plan_config);
 
     let now = chrono::Utc::now();
     let (period_start, period_end) = current_billing_period(now);
@@ -786,6 +803,7 @@ pub async fn handle_stripe_webhook(
     req: Request,
     payment_provider: &dyn PaymentProvider,
     user_store: &dyn UserStore,
+    subscription_store: &dyn SubscriptionStore,
 ) -> Response<Body> {
     let signature = match req
         .headers()
@@ -801,7 +819,15 @@ pub async fn handle_stripe_webhook(
         Err(r) => return r,
     };
 
-    match webhook::handle_stripe_webhook(&body, &signature, payment_provider, user_store).await {
+    match webhook::handle_stripe_webhook(
+        &body,
+        &signature,
+        payment_provider,
+        user_store,
+        subscription_store,
+    )
+    .await
+    {
         Ok(()) => json_response(200, serde_json::json!({"received": true})),
         Err(webhook::WebhookError::InvalidSignature) => {
             error_response(400, "invalid webhook signature")
@@ -813,8 +839,12 @@ pub async fn handle_stripe_webhook(
     }
 }
 
-pub async fn handle_get_subscription(req: Request, user_store: &dyn UserStore) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
+pub async fn handle_get_subscription(
+    req: Request,
+    user_store: &dyn UserStore,
+    jwt_secret: &str,
+) -> Response<Body> {
+    let user_id = match extract_user_id(&req, jwt_secret) {
         Ok(id) => id,
         Err(r) => return r,
     };

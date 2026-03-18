@@ -1,5 +1,3 @@
-use std::env;
-
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
@@ -10,7 +8,6 @@ use crate::domain::value_objects::UserId;
 
 const BCRYPT_COST: u32 = 12;
 const TOKEN_EXPIRY_HOURS: i64 = 24;
-const JWT_SECRET_ENV: &str = "JWT_SECRET";
 const MIN_PASSWORD_LENGTH: usize = 8;
 const MAX_PASSWORD_LENGTH: usize = 72;
 
@@ -48,11 +45,15 @@ pub struct AuthResult {
 
 pub struct AuthUseCase<'a> {
     user_store: &'a dyn UserStore,
+    jwt_secret: &'a str,
 }
 
 impl<'a> AuthUseCase<'a> {
-    pub fn new(user_store: &'a dyn UserStore) -> Self {
-        Self { user_store }
+    pub fn new(user_store: &'a dyn UserStore, jwt_secret: &'a str) -> Self {
+        Self {
+            user_store,
+            jwt_secret,
+        }
     }
 
     pub async fn signup(&self, email: &str, password: &str) -> Result<AuthResult, AuthError> {
@@ -82,7 +83,7 @@ impl<'a> AuthUseCase<'a> {
             }
         })?;
 
-        let token = generate_token(user.id.as_str(), &user.email)?;
+        let token = generate_token(user.id.as_str(), &user.email, self.jwt_secret)?;
 
         Ok(AuthResult {
             token,
@@ -104,7 +105,7 @@ impl<'a> AuthUseCase<'a> {
             return Err(AuthError::InvalidCredentials);
         }
 
-        let token = generate_token(user.id.as_str(), &user.email)?;
+        let token = generate_token(user.id.as_str(), &user.email, self.jwt_secret)?;
 
         Ok(AuthResult {
             token,
@@ -112,10 +113,6 @@ impl<'a> AuthUseCase<'a> {
             email: user.email,
         })
     }
-}
-
-fn jwt_secret() -> String {
-    env::var(JWT_SECRET_ENV).expect("JWT_SECRET environment variable must be set")
 }
 
 fn validate_email(email: &str) -> Result<(), AuthError> {
@@ -132,7 +129,7 @@ fn validate_password(password: &str) -> Result<(), AuthError> {
     Ok(())
 }
 
-fn generate_token(user_id: &str, email: &str) -> Result<String, AuthError> {
+fn generate_token(user_id: &str, email: &str, jwt_secret: &str) -> Result<String, AuthError> {
     let now = Utc::now();
     let expiration = now + Duration::hours(TOKEN_EXPIRY_HOURS);
 
@@ -146,15 +143,15 @@ fn generate_token(user_id: &str, email: &str) -> Result<String, AuthError> {
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(jwt_secret().as_bytes()),
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
     )
     .map_err(|e| AuthError::TokenError(e.to_string()))
 }
 
-pub fn validate_token(token: &str) -> Result<Claims, AuthError> {
+pub fn validate_token(token: &str, jwt_secret: &str) -> Result<Claims, AuthError> {
     decode::<Claims>(
         token,
-        &DecodingKey::from_secret(jwt_secret().as_bytes()),
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
         &Validation::default(),
     )
     .map(|data| data.claims)
@@ -164,32 +161,21 @@ pub fn validate_token(token: &str) -> Result<Claims, AuthError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
 
-    static TEST_MUTEX: Mutex<()> = Mutex::new(());
-
-    fn with_jwt_secret<F: FnOnce()>(f: F) {
-        let _lock = TEST_MUTEX.lock().unwrap();
-        unsafe { env::set_var(JWT_SECRET_ENV, "test-secret") };
-        f();
-    }
+    const TEST_SECRET: &str = "test-secret";
 
     #[test]
     fn generates_and_validates_token() {
-        with_jwt_secret(|| {
-            let token = generate_token("user-123", "test@example.com").unwrap();
-            let claims = validate_token(&token).unwrap();
-            assert_eq!(claims.sub, "user-123");
-            assert_eq!(claims.email, "test@example.com");
-        });
+        let token = generate_token("user-123", "test@example.com", TEST_SECRET).unwrap();
+        let claims = validate_token(&token, TEST_SECRET).unwrap();
+        assert_eq!(claims.sub, "user-123");
+        assert_eq!(claims.email, "test@example.com");
     }
 
     #[test]
     fn rejects_invalid_token() {
-        with_jwt_secret(|| {
-            let result = validate_token("invalid-token");
-            assert!(result.is_err());
-        });
+        let result = validate_token("invalid-token", TEST_SECRET);
+        assert!(result.is_err());
     }
 
     #[test]

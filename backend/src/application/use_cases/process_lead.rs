@@ -5,7 +5,7 @@ use crate::application::ports::{
     AiClient, AiError, PricingStore, QuoteStore, StoreError, UsageStore, UserStore,
 };
 use crate::domain::entities::*;
-use crate::domain::quota::{current_billing_period, quota_for_price, QuotaLimit};
+use crate::domain::quota::{current_billing_period, quota_for_price, PlanConfig, QuotaLimit};
 use crate::domain::value_objects::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -28,7 +28,7 @@ pub struct ProcessLeadUseCase<'a> {
     quote_store: &'a dyn QuoteStore,
     usage_store: &'a dyn UsageStore,
     user_store: &'a dyn UserStore,
-    allowed_price_ids: &'a [String],
+    plan_config: &'a PlanConfig,
 }
 
 impl<'a> ProcessLeadUseCase<'a> {
@@ -38,7 +38,7 @@ impl<'a> ProcessLeadUseCase<'a> {
         quote_store: &'a dyn QuoteStore,
         usage_store: &'a dyn UsageStore,
         user_store: &'a dyn UserStore,
-        allowed_price_ids: &'a [String],
+        plan_config: &'a PlanConfig,
     ) -> Self {
         Self {
             pricing_store,
@@ -46,7 +46,7 @@ impl<'a> ProcessLeadUseCase<'a> {
             quote_store,
             usage_store,
             user_store,
-            allowed_price_ids,
+            plan_config,
         }
     }
 
@@ -107,7 +107,7 @@ impl<'a> ProcessLeadUseCase<'a> {
             .ok_or(ProcessLeadError::UserNotFound)?;
 
         let price_id = user.subscription_plan.as_deref().unwrap_or("");
-        let limit = quota_for_price(price_id, self.allowed_price_ids);
+        let limit = quota_for_price(price_id, self.plan_config);
 
         let max = match limit {
             QuotaLimit::Unlimited => None,

@@ -5,7 +5,7 @@ use mongodb::{Client, Collection, Database};
 use mongodb::options::FindOptions;
 
 use crate::application::ports::{
-    PricingStore, QuoteStore, StoreError, TokenStore, UsageStore, UserStore,
+    PricingStore, QuoteStore, StoreError, SubscriptionStore, TokenStore, UsageStore, UserStore,
 };
 use crate::domain::entities::{
     PricingTemplate, QuoteDraft, SubscriptionStatus, TokenPurpose, UsageRecord, User,
@@ -262,11 +262,14 @@ impl UserStore for MongoStore {
             .await
             .map_err(|e| StoreError::Internal(e.to_string()))
     }
+}
 
+#[async_trait]
+impl SubscriptionStore for MongoStore {
     async fn update_subscription(
         &self,
         user_id: &UserId,
-        stripe_customer_id: &str,
+        provider_customer_id: &str,
         status: SubscriptionStatus,
         plan: Option<String>,
     ) -> Result<(), StoreError> {
@@ -278,7 +281,7 @@ impl UserStore for MongoStore {
 
         let update = doc! {
             "$set": {
-                "stripe_customer_id": stripe_customer_id,
+                "stripe_customer_id": provider_customer_id,
                 "subscription_status": status_bson,
                 "subscription_plan": plan_bson,
             }
@@ -292,7 +295,7 @@ impl UserStore for MongoStore {
         Ok(())
     }
 
-    async fn find_by_stripe_customer_id(
+    async fn find_by_provider_customer_id(
         &self,
         customer_id: &str,
     ) -> Result<Option<User>, StoreError> {
