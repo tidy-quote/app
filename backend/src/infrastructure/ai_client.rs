@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -59,6 +61,8 @@ struct ChatResponseMessage {
 }
 
 const TEMPERATURE: f64 = 0.3;
+const AI_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+const AI_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 fn extract_json(text: &str) -> &str {
     let trimmed = text.trim();
@@ -76,10 +80,13 @@ fn extract_json(text: &str) -> &str {
 
 impl OpenAiCompatibleClient {
     pub fn new(config: AiClientConfig) -> Self {
-        Self {
-            config,
-            http: Client::new(),
-        }
+        let http = Client::builder()
+            .timeout(AI_REQUEST_TIMEOUT)
+            .connect_timeout(AI_CONNECT_TIMEOUT)
+            .build()
+            .expect("failed to build AI HTTP client");
+
+        Self { config, http }
     }
 
     async fn chat_completion(&self, messages: Vec<ChatMessage>) -> Result<String, AiError> {

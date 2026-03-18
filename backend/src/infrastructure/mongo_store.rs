@@ -1,8 +1,12 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use mongodb::bson::{self, doc};
+use mongodb::options::{ClientOptions, FindOptions};
 use mongodb::{Client, Collection, Database};
 
-use mongodb::options::FindOptions;
+const MONGO_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const MONGO_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(5);
 
 use crate::application::ports::{
     PricingStore, QuoteStore, StoreError, SubscriptionStore, TokenStore, UsageStore, UserStore,
@@ -34,9 +38,15 @@ impl MongoStore {
     }
 
     pub async fn with_database(connection_uri: &str, db_name: &str) -> Result<Self, StoreError> {
-        let client = Client::with_uri_str(connection_uri)
+        let mut options = ClientOptions::parse(connection_uri)
             .await
             .map_err(|e| StoreError::Connection(e.to_string()))?;
+
+        options.connect_timeout = Some(MONGO_CONNECT_TIMEOUT);
+        options.server_selection_timeout = Some(MONGO_SERVER_SELECTION_TIMEOUT);
+
+        let client =
+            Client::with_options(options).map_err(|e| StoreError::Connection(e.to_string()))?;
 
         let db = client.database(db_name);
         Self::from_database(&db).await

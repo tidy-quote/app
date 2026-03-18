@@ -38,6 +38,7 @@ pub struct SavePricingRequest {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SubmitLeadRequest {
     pub raw_text: Option<String>,
     pub image_data: Vec<String>,

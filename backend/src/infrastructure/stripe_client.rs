@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
@@ -7,6 +9,8 @@ use crate::application::ports::{BillingEvent, PaymentError, PaymentProvider};
 
 const STRIPE_API_BASE: &str = "https://api.stripe.com/v1";
 const WEBHOOK_TOLERANCE_SECONDS: i64 = 300;
+const STRIPE_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const STRIPE_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct StripeClient {
     secret_key: String,
@@ -16,10 +20,16 @@ pub struct StripeClient {
 
 impl StripeClient {
     pub fn new(secret_key: String, webhook_secret: String) -> Self {
+        let http_client = reqwest::Client::builder()
+            .timeout(STRIPE_REQUEST_TIMEOUT)
+            .connect_timeout(STRIPE_CONNECT_TIMEOUT)
+            .build()
+            .expect("failed to build Stripe HTTP client");
+
         Self {
             secret_key,
             webhook_secret,
-            http_client: reqwest::Client::new(),
+            http_client,
         }
     }
 }

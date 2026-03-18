@@ -108,7 +108,7 @@ export async function generateQuote(
   if (hasBackend()) {
     return request<QuoteDraft>("/api/quote", {
       method: "POST",
-      body: JSON.stringify({ raw_text: rawText, image_data: imageDataUrls, tone }),
+      body: JSON.stringify({ rawText, imageData: imageDataUrls, tone }),
     });
   }
 
