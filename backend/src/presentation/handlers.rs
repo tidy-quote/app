@@ -2,15 +2,25 @@ use lambda_http::{Body, Request, Response};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
-use crate::application::ports::{AiClient, EmailSender, PricingStore, TokenStore, UserStore};
+use crate::application::ports::{
+    AiClient, EmailSender, PaymentProvider, PricingStore, TokenStore, UserStore,
+};
 use crate::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
+use crate::application::use_cases::checkout::{self, CheckoutError};
 use crate::application::use_cases::email_verification;
 use crate::application::use_cases::manage_pricing::ManagePricingUseCase;
 use crate::application::use_cases::password_reset;
 use crate::application::use_cases::process_lead::{ProcessLeadError, ProcessLeadUseCase};
+use crate::application::use_cases::webhook;
 use crate::domain::entities::*;
 use crate::domain::value_objects::*;
 use crate::presentation::validation;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckoutRequest {
+    pub price_id: String,
+}
 
 const APPLICATION_JSON: &str = "application/json";
 
@@ -241,6 +251,27 @@ async fn check_email_verified(
     Ok(())
 }
 
+#[allow(clippy::result_large_err)]
+async fn check_subscription(
+    user_id: &UserId,
+    user_store: &dyn UserStore,
+) -> Result<(), Response<Body>> {
+    let user = user_store
+        .find_by_id(user_id)
+        .await
+        .map_err(|e| {
+            error!(event = "check_subscription_error", error = %e);
+            error_response(500, "an internal error occurred")
+        })?
+        .ok_or_else(|| error_response(401, "user not found"))?;
+
+    if user.subscription_status != SubscriptionStatus::Active {
+        return Err(error_response(403, "subscription_required"));
+    }
+
+    Ok(())
+}
+
 pub async fn handle_save_pricing(
     req: Request,
     store: &dyn PricingStore,
@@ -252,6 +283,10 @@ pub async fn handle_save_pricing(
     };
 
     if let Err(r) = check_email_verified(&user_id, user_store).await {
+        return r;
+    }
+
+    if let Err(r) = check_subscription(&user_id, user_store).await {
         return r;
     }
 
@@ -305,6 +340,10 @@ pub async fn handle_get_pricing(
         return r;
     }
 
+    if let Err(r) = check_subscription(&user_id, user_store).await {
+        return r;
+    }
+
     let use_case = ManagePricingUseCase::new(store);
 
     match use_case.get_template(&user_id).await {
@@ -329,6 +368,10 @@ pub async fn handle_submit_lead(
     };
 
     if let Err(r) = check_email_verified(&user_id, user_store).await {
+        return r;
+    }
+
+    if let Err(r) = check_subscription(&user_id, user_store).await {
         return r;
     }
 
@@ -511,6 +554,79 @@ pub async fn handle_reset_password(
         Err(e) => {
             error!(event = "reset_password_error", error = %e);
             error_response(500, "an internal error occurred")
+        }
+    }
+}
+
+pub async fn handle_checkout(
+    req: Request,
+    user_store: &dyn UserStore,
+    payment_provider: &dyn PaymentProvider,
+    app_base_url: &str,
+    allowed_price_ids: &[String],
+) -> Response<Body> {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    let body = match parse_body(&req) {
+        Ok(b) => b,
+        Err(r) => return r,
+    };
+
+    let payload: CheckoutRequest = match serde_json::from_str(&body) {
+        Ok(p) => p,
+        Err(e) => return error_response(400, &format!("invalid JSON: {}", e)),
+    };
+
+    match checkout::create_checkout(
+        &user_id,
+        &payload.price_id,
+        user_store,
+        payment_provider,
+        app_base_url,
+        allowed_price_ids,
+    )
+    .await
+    {
+        Ok(url) => json_response(200, serde_json::json!({"url": url})),
+        Err(CheckoutError::InvalidPriceId) => error_response(400, "invalid price ID"),
+        Err(CheckoutError::UserNotFound) => error_response(404, "user not found"),
+        Err(e) => {
+            error!(event = "checkout_error", error = %e);
+            error_response(500, "an internal error occurred")
+        }
+    }
+}
+
+pub async fn handle_stripe_webhook(
+    req: Request,
+    payment_provider: &dyn PaymentProvider,
+    user_store: &dyn UserStore,
+) -> Response<Body> {
+    let signature = match req
+        .headers()
+        .get("Stripe-Signature")
+        .and_then(|v| v.to_str().ok())
+    {
+        Some(s) => s.to_string(),
+        None => return error_response(400, "missing Stripe-Signature header"),
+    };
+
+    let body = match parse_body(&req) {
+        Ok(b) => b,
+        Err(r) => return r,
+    };
+
+    match webhook::handle_stripe_webhook(&body, &signature, payment_provider, user_store).await {
+        Ok(()) => json_response(200, serde_json::json!({"received": true})),
+        Err(webhook::WebhookError::InvalidSignature) => {
+            error_response(400, "invalid webhook signature")
+        }
+        Err(e) => {
+            error!(event = "webhook_error", error = %e);
+            error_response(500, "webhook processing failed")
         }
     }
 }

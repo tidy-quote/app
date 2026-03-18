@@ -5,6 +5,16 @@ use serde::{Deserialize, Serialize};
 
 use super::value_objects::*;
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubscriptionStatus {
+    #[default]
+    None,
+    Active,
+    Cancelled,
+    PastDue,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: UserId,
@@ -12,6 +22,12 @@ pub struct User {
     pub password_hash: String,
     #[serde(default)]
     pub email_verified: bool,
+    #[serde(default)]
+    pub stripe_customer_id: Option<String>,
+    #[serde(default)]
+    pub subscription_status: SubscriptionStatus,
+    #[serde(default)]
+    pub subscription_plan: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 

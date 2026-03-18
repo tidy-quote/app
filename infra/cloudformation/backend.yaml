@@ -50,6 +50,31 @@ Parameters:
     Default: 'https://app.tidyquote.app'
     Description: Frontend app base URL (used for email links)
 
+  StripeSecretKey:
+    Type: String
+    NoEcho: true
+    Description: Stripe secret API key
+
+  StripeWebhookSecret:
+    Type: String
+    NoEcho: true
+    Description: Stripe webhook signing secret
+
+  StripePriceStarter:
+    Type: String
+    Default: price_1TCMRxCBmxXmjcZUj7339AUj
+    Description: Stripe price ID for Starter plan
+
+  StripePriceSolo:
+    Type: String
+    Default: price_1TCMS3CBmxXmjcZUvX8lfK34
+    Description: Stripe price ID for Solo plan
+
+  StripePricePro:
+    Type: String
+    Default: price_1TCMS4CBmxXmjcZUepPzhDfL
+    Description: Stripe price ID for Pro plan
+
 Resources:
   LambdaExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -102,6 +127,11 @@ Resources:
           JWT_SECRET: !Ref JwtSecret
           SES_SENDER: !Ref SesSender
           APP_BASE_URL: !Ref AppBaseUrl
+          STRIPE_SECRET_KEY: !Ref StripeSecretKey
+          STRIPE_WEBHOOK_SECRET: !Ref StripeWebhookSecret
+          STRIPE_PRICE_STARTER: !Ref StripePriceStarter
+          STRIPE_PRICE_SOLO: !Ref StripePriceSolo
+          STRIPE_PRICE_PRO: !Ref StripePricePro
       Architectures:
         - x86_64
 

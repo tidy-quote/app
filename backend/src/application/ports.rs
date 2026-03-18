@@ -5,6 +5,22 @@ use crate::domain::entities::*;
 use crate::domain::value_objects::*;
 
 #[derive(Debug, Error)]
+pub enum PaymentError {
+    #[error("payment provider error: {0}")]
+    ProviderError(String),
+    #[error("invalid webhook signature")]
+    InvalidSignature,
+}
+
+pub struct StripeEvent {
+    pub event_type: String,
+    pub customer_id: Option<String>,
+    pub customer_email: Option<String>,
+    pub subscription_status: Option<String>,
+    pub price_id: Option<String>,
+}
+
+#[derive(Debug, Error)]
 pub enum EmailError {
     #[error("failed to send email: {0}")]
     SendFailed(String),
@@ -49,6 +65,17 @@ pub trait UserStore: Send + Sync {
     async fn set_email_verified(&self, user_id: &UserId) -> Result<(), StoreError>;
     async fn update_password(&self, user_id: &UserId, password_hash: &str) -> Result<(), StoreError>;
     async fn find_by_id(&self, user_id: &UserId) -> Result<Option<User>, StoreError>;
+    async fn update_subscription(
+        &self,
+        user_id: &UserId,
+        stripe_customer_id: &str,
+        status: SubscriptionStatus,
+        plan: Option<String>,
+    ) -> Result<(), StoreError>;
+    async fn find_by_stripe_customer_id(
+        &self,
+        customer_id: &str,
+    ) -> Result<Option<User>, StoreError>;
 }
 
 #[async_trait]
@@ -82,4 +109,21 @@ pub trait AiClient: Send + Sync {
         tone: &ToneOption,
         currency: &str,
     ) -> Result<String, AiError>;
+}
+
+#[async_trait]
+pub trait PaymentProvider: Send + Sync {
+    async fn create_checkout_session(
+        &self,
+        customer_email: &str,
+        price_id: &str,
+        success_url: &str,
+        cancel_url: &str,
+    ) -> Result<String, PaymentError>;
+
+    fn verify_webhook_signature(
+        &self,
+        payload: &str,
+        signature: &str,
+    ) -> Result<StripeEvent, PaymentError>;
 }

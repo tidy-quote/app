@@ -3421,6 +3421,8 @@ dependencies = [
  "bcrypt",
  "chrono",
  "dotenv",
+ "hex",
+ "hmac",
  "jsonwebtoken",
  "lambda_http",
  "lambda_runtime",

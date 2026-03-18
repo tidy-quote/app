@@ -3,7 +3,9 @@ use mongodb::bson::{self, doc};
 use mongodb::{Client, Collection, Database};
 
 use crate::application::ports::{PricingStore, StoreError, TokenStore, UserStore};
-use crate::domain::entities::{PricingTemplate, TokenPurpose, User, VerificationToken};
+use crate::domain::entities::{
+    PricingTemplate, SubscriptionStatus, TokenPurpose, User, VerificationToken,
+};
 use crate::domain::value_objects::UserId;
 
 const DEFAULT_DB_NAME: &str = "tidy-quote";
@@ -144,6 +146,47 @@ impl UserStore for MongoStore {
 
     async fn find_by_id(&self, user_id: &UserId) -> Result<Option<User>, StoreError> {
         let filter = doc! { "id": user_id.as_str() };
+
+        self.users_collection
+            .find_one(filter)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))
+    }
+
+    async fn update_subscription(
+        &self,
+        user_id: &UserId,
+        stripe_customer_id: &str,
+        status: SubscriptionStatus,
+        plan: Option<String>,
+    ) -> Result<(), StoreError> {
+        let filter = doc! { "id": user_id.as_str() };
+        let status_bson =
+            bson::to_bson(&status).map_err(|e| StoreError::Serialization(e.to_string()))?;
+        let plan_bson =
+            bson::to_bson(&plan).map_err(|e| StoreError::Serialization(e.to_string()))?;
+
+        let update = doc! {
+            "$set": {
+                "stripe_customer_id": stripe_customer_id,
+                "subscription_status": status_bson,
+                "subscription_plan": plan_bson,
+            }
+        };
+
+        self.users_collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn find_by_stripe_customer_id(
+        &self,
+        customer_id: &str,
+    ) -> Result<Option<User>, StoreError> {
+        let filter = doc! { "stripe_customer_id": customer_id };
 
         self.users_collection
             .find_one(filter)

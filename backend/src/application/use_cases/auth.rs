@@ -5,7 +5,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 
 use crate::application::ports::{StoreError, UserStore};
-use crate::domain::entities::User;
+use crate::domain::entities::{SubscriptionStatus, User};
 use crate::domain::value_objects::UserId;
 
 const BCRYPT_COST: u32 = 12;
@@ -66,6 +66,9 @@ impl<'a> AuthUseCase<'a> {
             email: email.to_string(),
             password_hash,
             email_verified: false,
+            stripe_customer_id: None,
+            subscription_status: SubscriptionStatus::default(),
+            subscription_plan: None,
             created_at: Utc::now(),
         };
 

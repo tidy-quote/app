@@ -8,13 +8,16 @@ use tracing_subscriber::{fmt, EnvFilter};
 use tidy_quote_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
 use tidy_quote_backend::infrastructure::mongo_store::MongoStore;
 use tidy_quote_backend::infrastructure::ses_client::SesEmailClient;
+use tidy_quote_backend::infrastructure::stripe_client::StripeClient;
 use tidy_quote_backend::presentation::handlers;
 
 struct AppState {
     store: MongoStore,
     ai_client: OpenAiCompatibleClient,
     email_sender: SesEmailClient,
+    stripe_client: StripeClient,
     app_base_url: String,
+    allowed_price_ids: Vec<String>,
 }
 
 async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, lambda_http::Error> {
@@ -74,6 +77,19 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
         ("POST", "/api/quote") => {
             handlers::handle_submit_lead(req, &state.store, &state.ai_client, &state.store).await
         }
+        ("POST", "/api/checkout") => {
+            handlers::handle_checkout(
+                req,
+                &state.store,
+                &state.stripe_client,
+                &state.app_base_url,
+                &state.allowed_price_ids,
+            )
+            .await
+        }
+        ("POST", "/api/webhook/stripe") => {
+            handlers::handle_stripe_webhook(req, &state.stripe_client, &state.store).await
+        }
         _ => Response::builder()
             .status(404)
             .header("Content-Type", "application/json")
@@ -101,6 +117,16 @@ async fn main() -> Result<(), lambda_http::Error> {
     let ai_model = env::var("AI_MODEL").unwrap_or_else(|_| "openai/gpt-4o-mini".to_string());
     let ses_sender = env::var("SES_SENDER").expect("SES_SENDER must be set");
     let app_base_url = env::var("APP_BASE_URL").expect("APP_BASE_URL must be set");
+    let stripe_secret_key =
+        env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY must be set");
+    let stripe_webhook_secret =
+        env::var("STRIPE_WEBHOOK_SECRET").expect("STRIPE_WEBHOOK_SECRET must be set");
+    let stripe_price_starter =
+        env::var("STRIPE_PRICE_STARTER").expect("STRIPE_PRICE_STARTER must be set");
+    let stripe_price_solo =
+        env::var("STRIPE_PRICE_SOLO").expect("STRIPE_PRICE_SOLO must be set");
+    let stripe_price_pro =
+        env::var("STRIPE_PRICE_PRO").expect("STRIPE_PRICE_PRO must be set");
 
     let store = MongoStore::new(&mongo_uri)
         .await
@@ -113,12 +139,16 @@ async fn main() -> Result<(), lambda_http::Error> {
     });
 
     let email_sender = SesEmailClient::new(ses_sender).await;
+    let stripe_client = StripeClient::new(stripe_secret_key, stripe_webhook_secret);
+    let allowed_price_ids = vec![stripe_price_starter, stripe_price_solo, stripe_price_pro];
 
     let state = Arc::new(AppState {
         store,
         ai_client,
         email_sender,
+        stripe_client,
         app_base_url,
+        allowed_price_ids,
     });
 
     run(service_fn(move |req: Request| {
