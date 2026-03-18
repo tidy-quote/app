@@ -45,6 +45,9 @@ jobs:
         run: npm run build
         env:
           VITE_API_BASE: ${{ secrets.API_BASE_URL }}
+          VITE_STRIPE_PRICE_STARTER: ${{ secrets.VITE_STRIPE_PRICE_STARTER }}
+          VITE_STRIPE_PRICE_SOLO: ${{ secrets.VITE_STRIPE_PRICE_SOLO }}
+          VITE_STRIPE_PRICE_PRO: ${{ secrets.VITE_STRIPE_PRICE_PRO }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -147,6 +150,11 @@ jobs:
               AiApiKey="${{ secrets.AI_API_KEY }}" \
               AiModel="${{ secrets.AI_MODEL }}" \
               JwtSecret="${{ secrets.JWT_SECRET }}" \
+              StripeSecretKey="${{ secrets.STRIPE_SECRET_KEY }}" \
+              StripeWebhookSecret="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+              StripePriceStarter="${{ secrets.STRIPE_PRICE_STARTER }}" \
+              StripePriceSolo="${{ secrets.STRIPE_PRICE_SOLO }}" \
+              StripePricePro="${{ secrets.STRIPE_PRICE_PRO }}" \
               LambdaCodeBucket="${{ env.RELEASES_BUCKET }}" \
               LambdaCodeKey="${{ env.LAMBDA_CODE_KEY }}" \
             --no-fail-on-empty-changeset
