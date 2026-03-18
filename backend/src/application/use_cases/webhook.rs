@@ -49,17 +49,19 @@ pub async fn handle_stripe_webhook(
                     WebhookError::Internal(format!("no user found for email {email}"))
                 })?;
 
+            // Use Stripe's reported subscription status if available,
+            // rather than blindly assuming active (covers deferred payments like ACH/SEPA)
+            let status = match event.subscription_status.as_deref() {
+                Some(s) => map_stripe_status(Some(s)),
+                None => SubscriptionStatus::Active,
+            };
+
             user_store
-                .update_subscription(
-                    &user.id,
-                    customer_id,
-                    SubscriptionStatus::Active,
-                    event.price_id,
-                )
+                .update_subscription(&user.id, customer_id, status, event.price_id)
                 .await
                 .map_err(|e| WebhookError::Internal(e.to_string()))?;
 
-            info!(user_id = %user.id, "subscription activated via checkout");
+            info!(user_id = %user.id, status = ?event.subscription_status, "subscription set via checkout");
         }
         "customer.subscription.updated" => {
             let customer_id = event

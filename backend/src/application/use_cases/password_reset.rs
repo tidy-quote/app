@@ -40,7 +40,8 @@ pub async fn send_reset_email(
     let user = user_store.find_by_email(email).await?;
 
     let Some(user) = user else {
-        // Don't leak whether the email exists
+        // Don't leak whether the email exists — sleep to match timing of the happy path
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         return Ok(());
     };
 

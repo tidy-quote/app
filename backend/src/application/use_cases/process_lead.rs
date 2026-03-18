@@ -55,7 +55,7 @@ impl<'a> ProcessLeadUseCase<'a> {
         lead: &Lead,
         tone: ToneOption,
     ) -> Result<QuoteDraft, ProcessLeadError> {
-        self.check_quota(&lead.user_id).await?;
+        self.reserve_quota_slot(&lead.user_id).await?;
 
         let template = self
             .pricing_store
@@ -96,20 +96,10 @@ impl<'a> ProcessLeadUseCase<'a> {
 
         self.quote_store.save_quote(&quote).await?;
 
-        let (period_start, _) = current_billing_period(Utc::now());
-        self.usage_store
-            .increment_quote_count(&lead.user_id, period_start)
-            .await?;
-
-        info!(
-            event = "quota_incremented",
-            user_id = %lead.user_id,
-        );
-
         Ok(quote)
     }
 
-    async fn check_quota(&self, user_id: &UserId) -> Result<(), ProcessLeadError> {
+    async fn reserve_quota_slot(&self, user_id: &UserId) -> Result<(), ProcessLeadError> {
         let user = self
             .user_store
             .find_by_id(user_id)
@@ -120,24 +110,25 @@ impl<'a> ProcessLeadUseCase<'a> {
         let limit = quota_for_price(price_id, self.allowed_price_ids);
 
         let max = match limit {
-            QuotaLimit::Unlimited => return Ok(()),
-            QuotaLimit::Limited(n) => n,
+            QuotaLimit::Unlimited => None,
+            QuotaLimit::Limited(n) => Some(n),
         };
 
         let (period_start, period_end) = current_billing_period(Utc::now());
-        let usage = self
+        match self
             .usage_store
-            .get_or_create_usage(user_id, period_start, period_end)
-            .await?;
-
-        if usage.quote_count >= max {
-            return Err(ProcessLeadError::QuotaExceeded {
-                used: usage.quote_count,
-                limit: max,
-            });
+            .increment_and_check_quota(user_id, period_start, period_end, max)
+            .await
+        {
+            Ok(new_count) => {
+                info!(event = "quota_reserved", user_id = %user_id, count = new_count);
+                Ok(())
+            }
+            Err(StoreError::QuotaExceeded { used, limit }) => {
+                Err(ProcessLeadError::QuotaExceeded { used, limit })
+            }
+            Err(e) => Err(ProcessLeadError::Store(e)),
         }
-
-        Ok(())
     }
 }
 

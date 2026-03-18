@@ -39,6 +39,8 @@ pub enum StoreError {
     Internal(String),
     #[error("duplicate email: {0}")]
     DuplicateEmail(String),
+    #[error("quota exceeded: {used}/{limit}")]
+    QuotaExceeded { used: u32, limit: u32 },
 }
 
 #[derive(Debug, Error)]
@@ -124,11 +126,15 @@ pub trait UsageStore: Send + Sync {
         period_end: DateTime<Utc>,
     ) -> Result<UsageRecord, StoreError>;
 
-    async fn increment_quote_count(
+    /// Atomically increment quote_count and return the new value.
+    /// If the new count exceeds `limit`, the increment is rolled back and `QuotaExceeded` is returned.
+    async fn increment_and_check_quota(
         &self,
         user_id: &UserId,
         period_start: DateTime<Utc>,
-    ) -> Result<(), StoreError>;
+        period_end: DateTime<Utc>,
+        limit: Option<u32>,
+    ) -> Result<u32, StoreError>;
 }
 
 #[async_trait]

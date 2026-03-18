@@ -28,6 +28,8 @@ pub struct User {
     pub subscription_status: SubscriptionStatus,
     #[serde(default)]
     pub subscription_plan: Option<String>,
+    #[serde(default)]
+    pub password_changed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
 }
 

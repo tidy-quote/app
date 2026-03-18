@@ -36,6 +36,7 @@ pub enum AuthError {
 pub struct Claims {
     pub sub: String,
     pub email: String,
+    pub iat: usize,
     pub exp: usize,
 }
 
@@ -69,6 +70,7 @@ impl<'a> AuthUseCase<'a> {
             stripe_customer_id: None,
             subscription_status: SubscriptionStatus::default(),
             subscription_plan: None,
+            password_changed_at: None,
             created_at: Utc::now(),
         };
 
@@ -131,11 +133,13 @@ fn validate_password(password: &str) -> Result<(), AuthError> {
 }
 
 fn generate_token(user_id: &str, email: &str) -> Result<String, AuthError> {
-    let expiration = Utc::now() + Duration::hours(TOKEN_EXPIRY_HOURS);
+    let now = Utc::now();
+    let expiration = now + Duration::hours(TOKEN_EXPIRY_HOURS);
 
     let claims = Claims {
         sub: user_id.to_string(),
         email: email.to_string(),
+        iat: now.timestamp() as usize,
         exp: expiration.timestamp() as usize,
     };
 

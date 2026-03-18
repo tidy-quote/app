@@ -240,7 +240,11 @@ impl UserStore for MongoStore {
         password_hash: &str,
     ) -> Result<(), StoreError> {
         let filter = doc! { "id": user_id.as_str() };
-        let update = doc! { "$set": { "password_hash": password_hash } };
+        let now = bson::DateTime::from_millis(chrono::Utc::now().timestamp_millis());
+        let update = doc! { "$set": {
+            "password_hash": password_hash,
+            "password_changed_at": now,
+        } };
 
         self.users_collection
             .update_one(filter, update)
@@ -389,29 +393,53 @@ impl UsageStore for MongoStore {
         }
     }
 
-    async fn increment_quote_count(
+    async fn increment_and_check_quota(
         &self,
         user_id: &UserId,
         period_start: chrono::DateTime<chrono::Utc>,
-    ) -> Result<(), StoreError> {
+        period_end: chrono::DateTime<chrono::Utc>,
+        limit: Option<u32>,
+    ) -> Result<u32, StoreError> {
+        // Ensure usage record exists
+        self.get_or_create_usage(user_id, period_start, period_end)
+            .await?;
+
         let filter = doc! {
             "userId": user_id.as_str(),
             "periodStart": bson::DateTime::from_millis(period_start.timestamp_millis()),
         };
         let update = doc! { "$inc": { "quoteCount": 1_i32 } };
 
-        let result = self
-            .usage_collection
-            .update_one(filter, update)
-            .await
-            .map_err(|e| StoreError::Internal(e.to_string()))?;
+        let options = mongodb::options::FindOneAndUpdateOptions::builder()
+            .return_document(mongodb::options::ReturnDocument::After)
+            .build();
 
-        if result.modified_count == 0 {
-            return Err(StoreError::Internal(
-                "usage record not found for increment".to_string(),
-            ));
+        let updated = self
+            .usage_collection
+            .find_one_and_update(filter.clone(), update)
+            .with_options(options)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?
+            .ok_or_else(|| StoreError::Internal("usage record not found".to_string()))?;
+
+        let new_count = updated.quote_count;
+
+        // If there's a limit and we exceeded it, roll back the increment
+        if let Some(max) = limit {
+            if new_count > max {
+                let rollback = doc! { "$inc": { "quoteCount": -1_i32 } };
+                self.usage_collection
+                    .update_one(filter, rollback)
+                    .await
+                    .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+                return Err(StoreError::QuotaExceeded {
+                    used: new_count - 1,
+                    limit: max,
+                });
+            }
         }
 
-        Ok(())
+        Ok(new_count)
     }
 }

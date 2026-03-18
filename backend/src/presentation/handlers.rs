@@ -6,7 +6,7 @@ use crate::application::ports::{
     AiClient, EmailSender, PaymentProvider, PricingStore, QuoteStore, TokenStore, UsageStore,
     UserStore,
 };
-use crate::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
+use crate::application::use_cases::auth::{validate_token, AuthError, AuthUseCase, Claims};
 use crate::application::use_cases::checkout::{self, CheckoutError};
 use crate::application::use_cases::email_verification;
 use crate::application::use_cases::manage_pricing::ManagePricingUseCase;
@@ -113,7 +113,7 @@ fn parse_body(req: &Request) -> Result<String, Response<Body>> {
 }
 
 #[allow(clippy::result_large_err)]
-pub fn extract_user_id(req: &Request) -> Result<UserId, Response<Body>> {
+pub fn extract_user_id_and_claims(req: &Request) -> Result<(UserId, Claims), Response<Body>> {
     let auth_header = req
         .headers()
         .get("Authorization")
@@ -127,7 +127,13 @@ pub fn extract_user_id(req: &Request) -> Result<UserId, Response<Body>> {
     let claims =
         validate_token(token).map_err(|_| error_response(401, "invalid or expired token"))?;
 
-    Ok(UserId::new(claims.sub))
+    let user_id = UserId::new(claims.sub.clone());
+    Ok((user_id, claims))
+}
+
+#[allow(clippy::result_large_err)]
+pub fn extract_user_id(req: &Request) -> Result<UserId, Response<Body>> {
+    extract_user_id_and_claims(req).map(|(id, _)| id)
 }
 
 pub async fn handle_signup(
@@ -235,6 +241,7 @@ pub async fn handle_login(req: Request, user_store: &dyn UserStore) -> Response<
 #[allow(clippy::result_large_err)]
 async fn check_email_verified(
     user_id: &UserId,
+    token_iat: usize,
     user_store: &dyn UserStore,
 ) -> Result<(), Response<Body>> {
     let user = user_store
@@ -248,6 +255,13 @@ async fn check_email_verified(
 
     if !user.email_verified {
         return Err(error_response(403, "email_not_verified"));
+    }
+
+    // Revoke tokens issued before a password change
+    if let Some(changed_at) = user.password_changed_at {
+        if (token_iat as i64) < changed_at.timestamp() {
+            return Err(error_response(401, "token revoked after password change"));
+        }
     }
 
     Ok(())
@@ -279,12 +293,12 @@ pub async fn handle_save_pricing(
     store: &dyn PricingStore,
     user_store: &dyn UserStore,
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
-        Ok(id) => id,
+    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+        Ok(v) => v,
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, user_store).await {
+    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
         return r;
     }
 
@@ -333,12 +347,12 @@ pub async fn handle_get_pricing(
     store: &dyn PricingStore,
     user_store: &dyn UserStore,
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
-        Ok(id) => id,
+    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+        Ok(v) => v,
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, user_store).await {
+    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
         return r;
     }
 
@@ -367,12 +381,12 @@ pub async fn handle_submit_lead(
     usage_store: &dyn UsageStore,
     allowed_price_ids: &[String],
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
-        Ok(id) => id,
+    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+        Ok(v) => v,
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, user_store).await {
+    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
         return r;
     }
 
@@ -630,12 +644,12 @@ pub async fn handle_list_quotes(
     quote_store: &dyn QuoteStore,
     user_store: &dyn UserStore,
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
-        Ok(id) => id,
+    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+        Ok(v) => v,
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, user_store).await {
+    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
         return r;
     }
 
@@ -680,12 +694,12 @@ pub async fn handle_get_quote(
     quote_store: &dyn QuoteStore,
     user_store: &dyn UserStore,
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
-        Ok(id) => id,
+    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+        Ok(v) => v,
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, user_store).await {
+    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
         return r;
     }
 
@@ -714,12 +728,12 @@ pub async fn handle_get_usage(
     usage_store: &dyn UsageStore,
     allowed_price_ids: &[String],
 ) -> Response<Body> {
-    let user_id = match extract_user_id(&req) {
-        Ok(id) => id,
+    let (user_id, claims) = match extract_user_id_and_claims(&req) {
+        Ok(v) => v,
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, user_store).await {
+    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
         return r;
     }
 
