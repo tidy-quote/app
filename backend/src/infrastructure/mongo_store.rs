@@ -400,10 +400,17 @@ impl UsageStore for MongoStore {
         };
         let update = doc! { "$inc": { "quoteCount": 1_i32 } };
 
-        self.usage_collection
+        let result = self
+            .usage_collection
             .update_one(filter, update)
             .await
             .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        if result.modified_count == 0 {
+            return Err(StoreError::Internal(
+                "usage record not found for increment".to_string(),
+            ));
+        }
 
         Ok(())
     }

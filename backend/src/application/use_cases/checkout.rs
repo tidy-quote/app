@@ -33,8 +33,8 @@ pub async fn create_checkout(
         .map_err(|e| CheckoutError::Internal(e.to_string()))?
         .ok_or(CheckoutError::UserNotFound)?;
 
-    let success_url = format!("{app_base_url}/checkout/success");
-    let cancel_url = format!("{app_base_url}/checkout/cancel");
+    let success_url = format!("{app_base_url}/checkout-success");
+    let cancel_url = format!("{app_base_url}/choose-plan");
 
     let checkout_url = payment_provider
         .create_checkout_session(&user.email, price_id, &success_url, &cancel_url)

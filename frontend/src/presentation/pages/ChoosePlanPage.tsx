@@ -11,10 +11,14 @@ interface Plan {
   featured?: boolean;
 }
 
+const PRICE_STARTER = import.meta.env.VITE_STRIPE_PRICE_STARTER ?? "";
+const PRICE_SOLO = import.meta.env.VITE_STRIPE_PRICE_SOLO ?? "";
+const PRICE_PRO = import.meta.env.VITE_STRIPE_PRICE_PRO ?? "";
+
 const PLANS: Plan[] = [
   {
     name: "Starter",
-    priceId: "price_1TCMRxCBmxXmjcZUj7339AUj",
+    priceId: PRICE_STARTER,
     price: "$1.99",
     description: "Try it out with a few quotes each month.",
     features: [
@@ -26,7 +30,7 @@ const PLANS: Plan[] = [
   },
   {
     name: "Solo",
-    priceId: "price_1TCMS3CBmxXmjcZUvX8lfK34",
+    priceId: PRICE_SOLO,
     price: "$8.99",
     description: "For cleaners quoting multiple jobs a week.",
     features: [
@@ -39,7 +43,7 @@ const PLANS: Plan[] = [
   },
   {
     name: "Pro",
-    priceId: "price_1TCMS4CBmxXmjcZUepPzhDfL",
+    priceId: PRICE_PRO,
     price: "$19.99",
     description: "For busy cleaners who quote every day.",
     features: [
