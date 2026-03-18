@@ -6,5 +6,7 @@ export async function signUpAndLogin(page: Page): Promise<void> {
   await page.getByLabel("Password", { exact: true }).fill("password123");
   await page.getByLabel("Confirm Password").fill("password123");
   await page.getByRole("button", { name: "Sign Up" }).click();
-  await page.waitForURL("/");
+  await page.waitForURL("/verify");
+  // In mock mode, go directly to dashboard (no real email verification)
+  await page.goto("/");
 }

@@ -10,15 +10,15 @@ test("redirects to login when not authenticated", async ({ page }) => {
   await expect(page).toHaveURL("/login");
 });
 
-test("can sign up and access dashboard", async ({ page }) => {
+test("can sign up and reach verify email page", async ({ page }) => {
   await page.goto("/signup");
   await page.getByLabel("Email").fill("test@example.com");
   await page.getByLabel("Password", { exact: true }).fill("password123");
   await page.getByLabel("Confirm Password").fill("password123");
   await page.getByRole("button", { name: "Sign Up" }).click();
 
-  await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { name: "Welcome to Tidy-Quote" })).toBeVisible();
+  await expect(page).toHaveURL("/verify");
+  await expect(page.getByText("Check your email")).toBeVisible();
 });
 
 test("shows error when passwords do not match", async ({ page }) => {
@@ -46,7 +46,8 @@ test("can log out", async ({ page }) => {
   await page.getByLabel("Password", { exact: true }).fill("password123");
   await page.getByLabel("Confirm Password").fill("password123");
   await page.getByRole("button", { name: "Sign Up" }).click();
-  await expect(page).toHaveURL("/");
+  await page.waitForURL("/verify");
+  await page.goto("/");
 
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL("/login");
