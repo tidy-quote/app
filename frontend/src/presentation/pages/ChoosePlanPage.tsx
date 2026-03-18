@@ -65,7 +65,7 @@ export function ChoosePlanPage(): React.JSX.Element {
 
     try {
       const url = await createCheckoutSession(priceId);
-      window.location.href = url;
+      window.location.assign(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
       setLoading(null);
