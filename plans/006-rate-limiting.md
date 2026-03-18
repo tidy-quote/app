@@ -15,13 +15,13 @@ Use API Gateway throttling to apply global rate limits.
 
 ### Phase 1: backend.yaml — automated
 
-- [ ] Add `ThrottlingBurstLimit` and `ThrottlingRateLimit` to `HttpApiStage` default route settings (e.g. 100 burst, 50 rate)
+- [x] Add `ThrottlingBurstLimit` and `ThrottlingRateLimit` to `HttpApiStage` default route settings (e.g. 100 burst, 50 rate)
 - [ ] Add a dedicated route for `/api/auth/{proxy+}` with stricter throttling (e.g. 10 burst, 5 rate)
-- [ ] API Gateway returns `429 Too Many Requests` automatically when throttled
+- [x] API Gateway returns `429 Too Many Requests` automatically when throttled
 
 ### Phase 2: deployer role (aws-infrastructure repo) — automated
 
-- [ ] No changes needed — deployer already has full `apigateway:*` on the API
+- [x] No changes needed — deployer already has full `apigateway:*` on the API
 
 ### Manual actions (you)
 

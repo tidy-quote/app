@@ -26,10 +26,10 @@ Require email verification after signup, before the user can proceed to plan sel
 
 ### Phase 2: Frontend (React) — automated
 
-- [ ] After signup, redirect to `VerifyEmailPage`: "Check your email" message + resend button
-- [ ] `/verify?token=...` route: reads token from URL, calls verify endpoint, on success redirects to plan selection (ADR-003)
-- [ ] Show error if token is expired or invalid, with resend option
-- [ ] Update routing logic: signup → verify email → choose plan → app
+- [x] After signup, redirect to `VerifyEmailPage`: "Check your email" message + resend button
+- [x] `/verify?token=...` route: reads token from URL, calls verify endpoint, on success redirects to plan selection (ADR-003)
+- [x] Show error if token is expired or invalid, with resend option
+- [x] Update routing logic: signup → verify email → choose plan → app
 - [ ] E2E test for verification flow (mock SES)
 
 ### Manual actions (you)

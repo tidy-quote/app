@@ -25,10 +25,10 @@ Persist quotes in MongoDB and add a history view.
 
 ### Phase 2: Frontend (React) — all automated
 
-- [ ] Add API client methods: `getQuotes(page)`, `getQuote(id)`
-- [ ] Replace dashboard quick actions with recent quotes list
-- [ ] Quote list item: lead preview (first ~60 chars), total price, date
-- [ ] Quote detail view: full job summary, price breakdown, follow-up message with copy button
+- [x] Add API client methods: `getQuotes(page)`, `getQuote(id)`
+- [x] Replace dashboard quick actions with recent quotes list
+- [x] Quote list item: lead preview (first ~60 chars), total price, date
+- [x] Quote detail view: full job summary, price breakdown, follow-up message with copy button
 - [ ] Loading skeleton, empty state ("No quotes yet — create your first one")
 - [ ] Update bottom nav: replace "Dashboard" with "Quotes" (or add a 4th tab)
 - [ ] E2E test for quote generation → appears in history → detail view

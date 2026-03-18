@@ -26,11 +26,11 @@ Track quote generation count per user per billing period. Enforce limits before 
 
 ### Phase 2: Frontend (React) — all automated
 
-- [ ] Call `GET /api/usage` on dashboard load
-- [ ] Show usage bar on dashboard (e.g. "3 / 5 quotes this month")
-- [ ] Show warning state when >= 80% used
-- [ ] Show "Limit reached — upgrade your plan" CTA when exhausted, linking to plan selection
-- [ ] Disable "New Quote" button when quota exceeded
+- [x] Call `GET /api/usage` on dashboard load
+- [x] Show usage bar on dashboard (e.g. "3 / 5 quotes this month")
+- [x] Show warning state when >= 80% used
+- [x] Show "Limit reached — upgrade your plan" CTA when exhausted, linking to plan selection
+- [x] Disable "New Quote" button when quota exceeded
 - [ ] E2E test for usage display
 
 ### Manual actions (you)

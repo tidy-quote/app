@@ -15,12 +15,12 @@ Add error boundaries at key layout points to catch rendering errors and show a f
 
 ### Phase 1: Frontend (React) — all automated
 
-- [ ] Create `ErrorBoundary` class component with `componentDidCatch` logging
-- [ ] Create `ErrorFallback` functional component: "Something went wrong" message + "Try again" button (resets error state)
-- [ ] Wrap `<Outlet />` inside `AppLayout` with `ErrorBoundary` — catches page-level errors without losing nav
-- [ ] Wrap root `<App />` in `main.tsx` with a top-level `ErrorBoundary` — last-resort fallback: "App error" + "Reload" button
-- [ ] Style fallback UI consistent with app design (uses existing CSS variables)
-- [ ] Tests: render a component that throws, verify fallback appears
+- [x] Create `ErrorBoundary` class component with `componentDidCatch` logging
+- [x] Create `ErrorFallback` functional component: "Something went wrong" message + "Try again" button (resets error state)
+- [x] Wrap `<Outlet />` inside `AppLayout` with `ErrorBoundary` — catches page-level errors without losing nav
+- [x] Wrap root `<App />` in `main.tsx` with a top-level `ErrorBoundary` — last-resort fallback: "App error" + "Reload" button
+- [x] Style fallback UI consistent with app design (uses existing CSS variables)
+- [x] Tests: render a component that throws, verify fallback appears
 
 ### Manual actions (you)
 

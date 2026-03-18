@@ -15,18 +15,18 @@ Implement a password reset flow using time-limited tokens and AWS SES for email 
 
 ### Phase 1: SES domain verification — partially automated
 
-- [ ] Verify `tidyquote.app` domain in SES via AWS CLI (`aws ses verify-domain-identity`)
-- [ ] CLI outputs DKIM tokens — add them as CNAME records in Cloudflare (manual)
-- [ ] Add SPF TXT record for SES in Cloudflare (manual, if not already present)
-- [ ] Set MAIL FROM domain via CLI (optional, improves deliverability)
-- [ ] Wait for domain verification to complete
+- [x] Verify `tidyquote.app` domain in SES via AWS CLI (`aws ses verify-domain-identity`)
+- [x] CLI outputs DKIM tokens — add them as CNAME records in Cloudflare (manual)
+- [x] Add SPF TXT record for SES in Cloudflare (manual, if not already present)
+- [x] Set MAIL FROM domain via CLI (optional, improves deliverability)
+- [x] Wait for domain verification to complete
 
 ### Phase 2: Infrastructure — deployer role (aws-infrastructure repo) — automated
 
-- [ ] Add SES permissions to deployer role: `ses:VerifyDomainIdentity`, `ses:GetIdentityVerificationAttributes` (for CI health checks)
-- [ ] Add SES send permissions to Lambda execution role in `backend.yaml`: `ses:SendEmail`, `ses:SendRawEmail`
-- [ ] Add `SES_SENDER` parameter to `backend.yaml` (default: `noreply@tidyquote.app`)
-- [ ] Pass `SES_SENDER` and `SES_REGION` env vars to Lambda
+- [x] Add SES permissions to deployer role: `ses:VerifyDomainIdentity`, `ses:GetIdentityVerificationAttributes` (for CI health checks)
+- [x] Add SES send permissions to Lambda execution role in `backend.yaml`: `ses:SendEmail`, `ses:SendRawEmail`
+- [x] Add `SES_SENDER` parameter to `backend.yaml` (default: `noreply@tidyquote.app`)
+- [x] Pass `SES_SENDER` and `SES_REGION` env vars to Lambda
 
 ### Phase 3: Backend (Rust) — automated
 
@@ -38,17 +38,17 @@ Implement a password reset flow using time-limited tokens and AWS SES for email 
 
 ### Phase 4: Frontend (React) — automated
 
-- [ ] "Forgot password?" link on login page
-- [ ] `ForgotPasswordPage`: email input → calls `POST /api/auth/forgot-password` → shows "Check your email" message
-- [ ] `ResetPasswordPage` at `/reset-password?token=...`: new password + confirm → calls `POST /api/auth/reset-password` → success → redirect to login
-- [ ] Handle invalid/expired token with clear error message
+- [x] "Forgot password?" link on login page
+- [x] `ForgotPasswordPage`: email input → calls `POST /api/auth/forgot-password` → shows "Check your email" message
+- [x] `ResetPasswordPage` at `/reset-password?token=...`: new password + confirm → calls `POST /api/auth/reset-password` → success → redirect to login
+- [x] Handle invalid/expired token with clear error message
 - [ ] E2E test for forgot password flow (mock SES)
 
 ### Manual actions (you)
 
-- [ ] Add DKIM CNAME records in Cloudflare (3 records, values provided by SES)
-- [ ] Add SPF TXT record in Cloudflare if not present
-- [ ] Request SES production access (AWS Support case) — sandbox only allows verified recipients
+- [x] Add DKIM CNAME records in Cloudflare (3 records, values provided by SES)
+- [x] Add SPF TXT record in Cloudflare if not present
+- [x] Request SES production access (AWS Support case) — sandbox only allows verified recipients
 
 ## Consequences
 

@@ -15,7 +15,7 @@ Add schema validation at the presentation layer for all API endpoints using serd
 
 ### Phase 1: Backend (Rust) — all automated
 
-- [ ] Define validation constraints as constants in a `validation` module:
+- [x] Define validation constraints as constants in a `validation` module:
   - Email: max 254 chars, valid format
   - Password: 8–72 chars
   - Lead text: 1–10,000 chars
@@ -24,11 +24,11 @@ Add schema validation at the presentation layer for all API endpoints using serd
   - Category/add-on name: max 100 chars
   - Price values: 0–99,999
   - Tone: must be one of `friendly`, `direct`, `premium`
-- [ ] Add `validate()` method to each request DTO (returns `Result<(), ValidationError>`)
-- [ ] Call `validate()` in handlers before passing to use cases
-- [ ] Return `400 { error: "..." }` with a descriptive message for each validation failure
-- [ ] Add API Gateway payload size limit to `backend.yaml` (10MB max, matching Lambda limit)
-- [ ] Tests for every validation rule (valid + invalid cases)
+- [x] Add `validate()` method to each request DTO (returns `Result<(), ValidationError>`)
+- [x] Call `validate()` in handlers before passing to use cases
+- [x] Return `400 { error: "..." }` with a descriptive message for each validation failure
+- [x] Add API Gateway payload size limit to `backend.yaml` (10MB max, matching Lambda limit)
+- [x] Tests for every validation rule (valid + invalid cases)
 
 ### Manual actions (you)
 

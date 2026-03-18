@@ -1,6 +1,6 @@
 # ADR-002: Email routing for info@tidyquote.app
 
-**Status**: accepted
+**Status**: done
 **Date**: 2026-03-18
 
 ## Context
@@ -13,11 +13,11 @@ Use Cloudflare Email Routing (free) to forward `info@tidyquote.app` to a persona
 
 ## Implementation
 
-- [ ] Enable Email Routing on Cloudflare (`tidyquote.app` zone)
-- [ ] Add personal email as verified destination
-- [ ] Create route: `info@tidyquote.app` → personal email
-- [ ] Verify MX and SPF DNS records were auto-added
-- [ ] Send test email to `info@tidyquote.app` and confirm delivery
+- [x] Enable Email Routing on Cloudflare (`tidyquote.app` zone)
+- [x] Add personal email as verified destination
+- [x] Create route: `info@tidyquote.app` → personal email
+- [x] Verify MX and SPF DNS records were auto-added
+- [x] Send test email to `info@tidyquote.app` and confirm delivery
 
 ## Consequences
 
