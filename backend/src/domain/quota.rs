@@ -175,4 +175,77 @@ mod tests {
         assert_eq!(start, Utc.with_ymd_and_hms(2026, 12, 1, 0, 0, 0).unwrap());
         assert_eq!(end, Utc.with_ymd_and_hms(2027, 1, 1, 0, 0, 0).unwrap());
     }
+
+    #[test]
+    fn billing_period_for_leap_year_february() {
+        let now = Utc.with_ymd_and_hms(2028, 2, 29, 23, 59, 59).unwrap();
+        let (start, end) = current_billing_period(now);
+        assert_eq!(start, Utc.with_ymd_and_hms(2028, 2, 1, 0, 0, 0).unwrap());
+        assert_eq!(end, Utc.with_ymd_and_hms(2028, 3, 1, 0, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn billing_period_for_non_leap_year_february() {
+        let now = Utc.with_ymd_and_hms(2027, 2, 15, 12, 0, 0).unwrap();
+        let (start, end) = current_billing_period(now);
+        assert_eq!(start, Utc.with_ymd_and_hms(2027, 2, 1, 0, 0, 0).unwrap());
+        assert_eq!(end, Utc.with_ymd_and_hms(2027, 3, 1, 0, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn billing_period_for_first_second_of_month() {
+        let now = Utc.with_ymd_and_hms(2026, 6, 1, 0, 0, 0).unwrap();
+        let (start, end) = current_billing_period(now);
+        assert_eq!(start, Utc.with_ymd_and_hms(2026, 6, 1, 0, 0, 0).unwrap());
+        assert_eq!(end, Utc.with_ymd_and_hms(2026, 7, 1, 0, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn billing_period_for_last_second_of_month() {
+        let now = Utc.with_ymd_and_hms(2026, 1, 31, 23, 59, 59).unwrap();
+        let (start, end) = current_billing_period(now);
+        assert_eq!(start, Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap());
+        assert_eq!(end, Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn plan_config_contains_known_ids() {
+        let plans = plan_config();
+        assert!(plans.contains("price_starter"));
+        assert!(plans.contains("price_solo"));
+        assert!(plans.contains("price_pro"));
+    }
+
+    #[test]
+    fn plan_config_rejects_unknown_id() {
+        let plans = plan_config();
+        assert!(!plans.contains("price_unknown"));
+    }
+
+    #[test]
+    fn plans_returns_three_entries() {
+        let plans = plan_config();
+        let info = plans.plans();
+        assert_eq!(info.len(), 3);
+        assert_eq!(info[0].name, "Starter");
+        assert_eq!(info[1].name, "Solo");
+        assert_eq!(info[2].name, "Pro");
+    }
+
+    #[test]
+    fn solo_plan_is_featured() {
+        let plans = plan_config();
+        let info = plans.plans();
+        let featured: Vec<_> = info.iter().filter(|p| p.featured).collect();
+        assert_eq!(featured.len(), 1);
+        assert_eq!(featured[0].name, "Solo");
+    }
+
+    #[test]
+    fn pro_plan_has_no_quota() {
+        let plans = plan_config();
+        let info = plans.plans();
+        let pro = info.iter().find(|p| p.name == "Pro").unwrap();
+        assert!(pro.quota.is_none());
+    }
 }

@@ -21,7 +21,7 @@ export function VerifyEmailPage(): React.JSX.Element {
     verifyEmail(token)
       .then(() => {
         setStatus("verified");
-        setTimeout(() => navigate("/"), 2000);
+        setTimeout(() => navigate("/login"), 2000);
       })
       .catch((err) => {
         setStatus("error");
@@ -58,7 +58,7 @@ export function VerifyEmailPage(): React.JSX.Element {
         {status === "verified" && (
           <>
             <h2 className="auth-title">Email verified</h2>
-            <p className="auth-message">Redirecting to the app...</p>
+            <p className="auth-message">Redirecting to login...</p>
           </>
         )}
 

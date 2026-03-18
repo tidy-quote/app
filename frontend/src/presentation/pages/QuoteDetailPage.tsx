@@ -8,12 +8,14 @@ export function QuoteDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const [quote, setQuote] = useState<QuoteDraft | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     getQuote(id)
       .then(setQuote)
+      .catch(() => setError("Failed to load quote. Please try again."))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -29,6 +31,15 @@ export function QuoteDetailPage(): React.JSX.Element {
     return (
       <div className="quote-page">
         <p className="quote-page__loading">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="quote-page">
+        <div className="error-banner" role="alert">{error}</div>
+        <Link to="/" className="quote-page__back">Back to dashboard</Link>
       </div>
     );
   }

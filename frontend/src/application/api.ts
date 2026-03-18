@@ -1,5 +1,5 @@
 import type { PricingTemplate, QuoteDraft, ToneOption } from "../domain/types";
-import { getToken } from "./auth";
+import { getToken, logout } from "./auth";
 
 const API_BASE: string | undefined = import.meta.env.VITE_API_BASE;
 const STORAGE_KEY = "tidy-quote:pricing-template";
@@ -21,13 +21,35 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: authHeaders(),
-    ...options,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      headers: authHeaders(),
+      signal: controller.signal,
+      ...options,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Request timed out. Please check your connection and try again.");
+    }
+    throw new Error("Unable to reach the server. Please check your connection and try again.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      logout();
+      window.location.assign("/login");
+      throw new Error("Session expired. Please log in again.");
+    }
+
     const body = await response.json().catch(() => ({}));
     throw new Error(
       (body as { error?: string }).error ?? `Request failed: ${response.status}`

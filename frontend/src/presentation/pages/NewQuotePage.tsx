@@ -157,6 +157,7 @@ export function NewQuotePage(): React.JSX.Element {
               readOnly
               value={result.followUpMessage}
               rows={10}
+              aria-label="Follow-up message"
             />
             <button
               type="button"
@@ -165,6 +166,11 @@ export function NewQuotePage(): React.JSX.Element {
             >
               {copied ? "Copied!" : "Copy Message"}
             </button>
+            {copied && (
+              <span role="status" className="sr-only">
+                Message copied to clipboard
+              </span>
+            )}
           </section>
         </div>
 

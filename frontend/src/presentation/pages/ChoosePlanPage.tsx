@@ -11,7 +11,7 @@ export function ChoosePlanPage(): React.JSX.Element {
   useEffect(() => {
     getPlans()
       .then(setPlans)
-      .catch(() => setError("Failed to load plans"))
+      .catch(() => setError("Failed to load plans. Please try again."))
       .finally(() => setLoadingPlans(false));
   }, []);
 
@@ -36,12 +36,12 @@ export function ChoosePlanPage(): React.JSX.Element {
 
         {error && (
           <div className="error-banner" role="alert">
-            {error}
+            <p>{error}</p>
           </div>
         )}
 
         {loadingPlans && (
-          <p className="auth-message">Loading plans...</p>
+          <p className="auth-message" role="status">Loading plans...</p>
         )}
 
         {!loadingPlans && plans.length > 0 && (
@@ -68,6 +68,7 @@ export function ChoosePlanPage(): React.JSX.Element {
                   className={`btn-primary plan-cta${plan.featured ? "" : " plan-cta--outline"}`}
                   onClick={() => handleChoose(plan.priceId)}
                   disabled={loading !== null}
+                  aria-label={`Get started with ${plan.name} plan`}
                 >
                   {loading === plan.priceId ? "Redirecting..." : "Get Started"}
                 </button>

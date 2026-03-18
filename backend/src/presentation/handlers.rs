@@ -247,16 +247,16 @@ pub async fn handle_login(
 }
 
 #[allow(clippy::result_large_err)]
-async fn check_email_verified(
+async fn authorize_user(
     user_id: &UserId,
     token_iat: usize,
     user_store: &dyn UserStore,
-) -> Result<(), Response<Body>> {
+) -> Result<User, Response<Body>> {
     let user = user_store
         .find_by_id(user_id)
         .await
         .map_err(|e| {
-            error!(event = "check_verified_error", error = %e);
+            error!(event = "authorize_user_error", error = %e);
             error_response(500, "an internal error occurred")
         })?
         .ok_or_else(|| error_response(401, "user not found"))?;
@@ -272,28 +272,11 @@ async fn check_email_verified(
         }
     }
 
-    Ok(())
-}
-
-#[allow(clippy::result_large_err)]
-async fn check_subscription(
-    user_id: &UserId,
-    user_store: &dyn UserStore,
-) -> Result<(), Response<Body>> {
-    let user = user_store
-        .find_by_id(user_id)
-        .await
-        .map_err(|e| {
-            error!(event = "check_subscription_error", error = %e);
-            error_response(500, "an internal error occurred")
-        })?
-        .ok_or_else(|| error_response(401, "user not found"))?;
-
     if user.subscription_status != SubscriptionStatus::Active {
         return Err(error_response(403, "subscription_required"));
     }
 
-    Ok(())
+    Ok(user)
 }
 
 pub async fn handle_save_pricing(
@@ -307,13 +290,10 @@ pub async fn handle_save_pricing(
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
-        return r;
-    }
-
-    if let Err(r) = check_subscription(&user_id, user_store).await {
-        return r;
-    }
+    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
 
     let body = match parse_body(&req) {
         Ok(b) => b,
@@ -362,13 +342,10 @@ pub async fn handle_get_pricing(
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
-        return r;
-    }
-
-    if let Err(r) = check_subscription(&user_id, user_store).await {
-        return r;
-    }
+    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
 
     let use_case = ManagePricingUseCase::new(store);
 
@@ -398,13 +375,10 @@ pub async fn handle_submit_lead(
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
-        return r;
-    }
-
-    if let Err(r) = check_subscription(&user_id, user_store).await {
-        return r;
-    }
+    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
 
     let body = match parse_body(&req) {
         Ok(b) => b,
@@ -664,13 +638,10 @@ pub async fn handle_list_quotes(
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
-        return r;
-    }
-
-    if let Err(r) = check_subscription(&user_id, user_store).await {
-        return r;
-    }
+    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
 
     let query = req.uri().query().unwrap_or("");
     let params: Vec<(String, String)> = url::form_urlencoded::parse(query.as_bytes())
@@ -715,13 +686,10 @@ pub async fn handle_get_quote(
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
-        return r;
-    }
-
-    if let Err(r) = check_subscription(&user_id, user_store).await {
-        return r;
-    }
+    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
 
     let quote_id = QuoteId::new(quote_id);
 
@@ -750,21 +718,9 @@ pub async fn handle_get_usage(
         Err(r) => return r,
     };
 
-    if let Err(r) = check_email_verified(&user_id, claims.iat, user_store).await {
-        return r;
-    }
-
-    if let Err(r) = check_subscription(&user_id, user_store).await {
-        return r;
-    }
-
-    let user = match user_store.find_by_id(&user_id).await {
-        Ok(Some(u)) => u,
-        Ok(None) => return error_response(401, "user not found"),
-        Err(e) => {
-            error!(event = "get_usage_error", error = %e);
-            return error_response(500, "an internal error occurred");
-        }
+    let user = match authorize_user(&user_id, claims.iat, user_store).await {
+        Ok(u) => u,
+        Err(r) => return r,
     };
 
     let price_id = user.subscription_plan.as_deref().unwrap_or("");

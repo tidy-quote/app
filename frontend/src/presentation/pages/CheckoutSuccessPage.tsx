@@ -40,29 +40,31 @@ export function CheckoutSuccessPage(): React.JSX.Element {
       <div className="auth-card">
         <h1 className="auth-logo">Tidy-Quote</h1>
 
-        {status === "polling" && (
-          <>
-            <h2 className="auth-title">Payment received</h2>
-            <p className="auth-message">Activating your subscription...</p>
-          </>
-        )}
+        <div role="status" aria-live="polite">
+          {status === "polling" && (
+            <>
+              <h2 className="auth-title">Payment received</h2>
+              <p className="auth-message">Activating your subscription...</p>
+            </>
+          )}
 
-        {status === "active" && (
-          <>
-            <h2 className="auth-title">Subscription active</h2>
-            <p className="auth-message">Redirecting to the app...</p>
-          </>
-        )}
+          {status === "active" && (
+            <>
+              <h2 className="auth-title">Subscription active</h2>
+              <p className="auth-message">Redirecting to the app...</p>
+            </>
+          )}
 
-        {status === "timeout" && (
-          <>
-            <h2 className="auth-title">Almost there</h2>
-            <p className="auth-message">
-              Your payment was received but activation is taking longer than expected.
-              Please refresh in a moment or contact support.
-            </p>
-          </>
-        )}
+          {status === "timeout" && (
+            <>
+              <h2 className="auth-title">Almost there</h2>
+              <p className="auth-message">
+                Your payment was received but activation is taking longer than expected.
+                Please refresh in a moment or contact support.
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

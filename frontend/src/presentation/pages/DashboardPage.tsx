@@ -67,7 +67,14 @@ export function DashboardPage(): React.JSX.Element {
             </span>
           </div>
           {usage.limit !== null && (
-            <div className="usage-bar__track">
+            <div
+              className="usage-bar__track"
+              role="progressbar"
+              aria-valuenow={usage.used}
+              aria-valuemin={0}
+              aria-valuemax={usage.limit}
+              aria-label={`${usage.used} of ${usage.limit} quotes used this month`}
+            >
               <div
                 className="usage-bar__fill"
                 style={{ width: `${Math.min(100, (usage.used / usage.limit) * 100)}%` }}
@@ -116,7 +123,7 @@ export function DashboardPage(): React.JSX.Element {
         <h3 className="recent-quotes__title">Recent Quotes</h3>
 
         {loadingQuotes && (
-          <div className="recent-quotes__loading">Loading...</div>
+          <div className="recent-quotes__loading" role="status">Loading...</div>
         )}
 
         {!loadingQuotes && quotes.length === 0 && (

@@ -65,16 +65,12 @@ fn extract_user_id(req: &HttpRequest, jwt_secret: &str) -> Result<UserId, HttpRe
     Ok(UserId::new(claims.sub))
 }
 
-fn check_email_verified_dev(user: &User) -> Result<(), HttpResponse> {
+fn authorize_user_dev(user: &User) -> Result<(), HttpResponse> {
     if !user.email_verified {
         return Err(
             HttpResponse::Forbidden().json(serde_json::json!({"error": "email_not_verified"}))
         );
     }
-    Ok(())
-}
-
-fn check_subscription_dev(user: &User) -> Result<(), HttpResponse> {
     if user.subscription_status != SubscriptionStatus::Active {
         return Err(
             HttpResponse::Forbidden().json(serde_json::json!({"error": "subscription_required"}))
@@ -293,10 +289,7 @@ async fn save_pricing(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes)
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = check_email_verified_dev(&user) {
-        return r;
-    }
-    if let Err(r) = check_subscription_dev(&user) {
+    if let Err(r) = authorize_user_dev(&user) {
         return r;
     }
 
@@ -345,10 +338,7 @@ async fn get_pricing(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = check_email_verified_dev(&user) {
-        return r;
-    }
-    if let Err(r) = check_subscription_dev(&user) {
+    if let Err(r) = authorize_user_dev(&user) {
         return r;
     }
 
@@ -380,10 +370,7 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = check_email_verified_dev(&user) {
-        return r;
-    }
-    if let Err(r) = check_subscription_dev(&user) {
+    if let Err(r) = authorize_user_dev(&user) {
         return r;
     }
 
@@ -446,10 +433,7 @@ async fn list_quotes(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = check_email_verified_dev(&user) {
-        return r;
-    }
-    if let Err(r) = check_subscription_dev(&user) {
+    if let Err(r) = authorize_user_dev(&user) {
         return r;
     }
 
@@ -500,10 +484,7 @@ async fn get_quote(
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = check_email_verified_dev(&user) {
-        return r;
-    }
-    if let Err(r) = check_subscription_dev(&user) {
+    if let Err(r) = authorize_user_dev(&user) {
         return r;
     }
 
@@ -534,10 +515,7 @@ async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = check_email_verified_dev(&user) {
-        return r;
-    }
-    if let Err(r) = check_subscription_dev(&user) {
+    if let Err(r) = authorize_user_dev(&user) {
         return r;
     }
 
@@ -568,6 +546,10 @@ async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse
         "limit": limit_value,
         "periodEnd": period_end.to_rfc3339(),
     }))
+}
+
+async fn get_plans(state: Data<Arc<AppState>>) -> HttpResponse {
+    HttpResponse::Ok().json(state.plan_config.plans())
 }
 
 async fn create_checkout(
@@ -722,6 +704,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/usage", web::get().to(get_usage))
             .route("/api/quotes", web::get().to(list_quotes))
             .route("/api/quotes/{id}", web::get().to(get_quote))
+            .route("/api/plans", web::get().to(get_plans))
             .route("/api/checkout", web::post().to(create_checkout))
             .route("/api/webhook/stripe", web::post().to(stripe_webhook))
     })

@@ -298,4 +298,42 @@ mod tests {
              3. access instructions"
         );
     }
+
+    #[test]
+    fn no_callout_fee_when_price_equals_minimum() {
+        let template = make_template(vec![("Standard Clean", 80.0)], 80.0);
+        let summary = make_summary("Standard Clean");
+
+        let (total, breakdown) = calculate_price(&summary, &template);
+
+        assert_eq!(total, 80.0);
+        assert_eq!(breakdown.len(), 1);
+    }
+
+    #[test]
+    fn no_callout_fee_when_price_exceeds_minimum() {
+        let template = make_template(vec![("Deep Clean", 120.0)], 50.0);
+        let summary = make_summary("Deep Clean");
+
+        let (total, breakdown) = calculate_price(&summary, &template);
+
+        assert_eq!(total, 120.0);
+        assert_eq!(breakdown.len(), 1);
+    }
+
+    #[test]
+    fn applies_minimum_callout_when_no_category_matches() {
+        let template = make_template(vec![("Deep Clean", 120.0)], 50.0);
+        let summary = make_summary("Unknown Service");
+
+        let (total, breakdown) = calculate_price(&summary, &template);
+
+        // No category matched, so total is 0 which is < 50, but
+        // the code only adds callout fee when total < minimum_callout
+        // AND there was a partial match. Let's verify actual behavior.
+        assert_eq!(total, 50.0);
+        assert_eq!(breakdown.len(), 1);
+        assert_eq!(breakdown[0].description, "Minimum callout fee");
+        assert_eq!(breakdown[0].amount, 50.0);
+    }
 }

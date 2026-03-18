@@ -187,6 +187,7 @@ export function PricingSetupPage(): React.JSX.Element {
               <input
                 className="form-input"
                 placeholder="Category name"
+                aria-label={`Category ${i + 1} name`}
                 value={cat.name}
                 onChange={(e) => updateCategory(i, "name", e.target.value)}
               />
@@ -195,6 +196,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 type="number"
                 min={0}
                 placeholder="Price"
+                aria-label={`Category ${i + 1} price`}
                 value={cat.basePrice || ""}
                 onChange={(e) =>
                   updateCategory(i, "basePrice", Number(e.target.value))
@@ -203,6 +205,7 @@ export function PricingSetupPage(): React.JSX.Element {
               <input
                 className="form-input"
                 placeholder="Description"
+                aria-label={`Category ${i + 1} description`}
                 value={cat.description}
                 onChange={(e) =>
                   updateCategory(i, "description", e.target.value)
@@ -212,7 +215,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 type="button"
                 className="btn-remove"
                 onClick={() => removeCategory(i)}
-                aria-label="Remove category"
+                aria-label={`Remove category ${i + 1}`}
               >
                 Remove
               </button>
@@ -230,6 +233,7 @@ export function PricingSetupPage(): React.JSX.Element {
               <input
                 className="form-input"
                 placeholder="Add-on name"
+                aria-label={`Add-on ${i + 1} name`}
                 value={addon.name}
                 onChange={(e) => updateAddOn(i, "name", e.target.value)}
               />
@@ -238,6 +242,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 type="number"
                 min={0}
                 placeholder="Price"
+                aria-label={`Add-on ${i + 1} price`}
                 value={addon.price || ""}
                 onChange={(e) =>
                   updateAddOn(i, "price", Number(e.target.value))
@@ -247,7 +252,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 type="button"
                 className="btn-remove"
                 onClick={() => removeAddOn(i)}
-                aria-label="Remove add-on"
+                aria-label={`Remove add-on ${i + 1}`}
               >
                 Remove
               </button>
@@ -264,6 +269,7 @@ export function PricingSetupPage(): React.JSX.Element {
             className="form-textarea"
             rows={3}
             placeholder="Any additional notes for quote generation..."
+            aria-label="Custom notes"
             value={customNotes}
             onChange={(e) => setCustomNotes(e.target.value)}
           />
