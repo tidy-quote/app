@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./presentation/components/AuthProvider";
 import { ProtectedRoute } from "./presentation/components/ProtectedRoute";
 import { AppLayout } from "./presentation/layouts/AppLayout";
+import { CheckoutSuccessPage } from "./presentation/pages/CheckoutSuccessPage";
+import { ChoosePlanPage } from "./presentation/pages/ChoosePlanPage";
 import { DashboardPage } from "./presentation/pages/DashboardPage";
 import { ForgotPasswordPage } from "./presentation/pages/ForgotPasswordPage";
 import { LoginPage } from "./presentation/pages/LoginPage";
@@ -21,6 +23,8 @@ export function App(): React.JSX.Element {
           <Route path="/verify" element={<VerifyEmailPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/choose-plan" element={<ChoosePlanPage />} />
+          <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<DashboardPage />} />

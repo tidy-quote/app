@@ -130,6 +130,16 @@ export async function generateQuote(
   };
 }
 
+export async function createCheckoutSession(
+  priceId: string
+): Promise<string> {
+  const result = await request<{ url: string }>("/api/checkout", {
+    method: "POST",
+    body: JSON.stringify({ priceId }),
+  });
+  return result.url;
+}
+
 export async function verifyEmail(token: string): Promise<void> {
   await request("/api/auth/verify-email", {
     method: "POST",
