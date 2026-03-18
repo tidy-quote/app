@@ -189,6 +189,14 @@ After completing each implementation, always refactor the code:
 - Remove dead code
 - Simplify what can be simplified (redundant branches, nested conditions, duplicate logic)
 
+## ADR Maintenance
+
+After completing any task that relates to an ADR in `plans/`:
+- Update the relevant ADR checklist — check off completed items, leave genuinely unfinished items unchecked
+- If all items are done, set the status to `done`
+- If work is partially complete, set the status to `in-progress`
+- Never leave an ADR marked `done` with unchecked items, or marked `accepted` when work has started
+
 ## What NOT to Do
 
 - Don't add features beyond what was asked
