@@ -44,9 +44,12 @@ export function AppLayout(): React.JSX.Element {
     <div className="app-layout">
       <header className="app-header">
         <h1 className="app-logo"><img src="/logo.svg" alt="" className="app-logo-img" />Tidy-Quote</h1>
-        <button type="button" className="btn-logout" onClick={handleLogout}>
-          Log out
-        </button>
+        <div className="app-header-actions">
+          <a href="mailto:info@tidyquote.app" className="btn-support">Support</a>
+          <button type="button" className="btn-logout" onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
       </header>
 
       <main className="app-main">

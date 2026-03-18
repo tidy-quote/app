@@ -46,6 +46,28 @@
   object-fit: contain;
 }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-support {
+  padding: 0.375rem 0.875rem;
+  color: var(--cl-text-muted);
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+.btn-support:hover {
+  color: var(--cl-amber);
+}
+
 .btn-logout {
   padding: 0.375rem 0.875rem;
   background: transparent;
