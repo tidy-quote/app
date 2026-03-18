@@ -4,9 +4,12 @@ use mongodb::{Client, Collection, Database};
 
 use mongodb::options::FindOptions;
 
-use crate::application::ports::{PricingStore, QuoteStore, StoreError, TokenStore, UserStore};
+use crate::application::ports::{
+    PricingStore, QuoteStore, StoreError, TokenStore, UsageStore, UserStore,
+};
 use crate::domain::entities::{
-    PricingTemplate, QuoteDraft, SubscriptionStatus, TokenPurpose, User, VerificationToken,
+    PricingTemplate, QuoteDraft, SubscriptionStatus, TokenPurpose, UsageRecord, User,
+    VerificationToken,
 };
 use crate::domain::value_objects::{QuoteId, UserId};
 
@@ -15,12 +18,14 @@ const COLLECTION_PRICING_TEMPLATES: &str = "pricing_templates";
 const COLLECTION_USERS: &str = "users";
 const COLLECTION_QUOTES: &str = "quotes";
 const COLLECTION_VERIFICATION_TOKENS: &str = "verification_tokens";
+const COLLECTION_USAGE: &str = "usage";
 
 pub struct MongoStore {
     pricing_collection: Collection<PricingTemplate>,
     users_collection: Collection<User>,
     quotes_collection: Collection<QuoteDraft>,
     tokens_collection: Collection<VerificationToken>,
+    usage_collection: Collection<UsageRecord>,
 }
 
 impl MongoStore {
@@ -41,17 +46,19 @@ impl MongoStore {
         let pricing_collection = db.collection::<PricingTemplate>(COLLECTION_PRICING_TEMPLATES);
         let users_collection = db.collection::<User>(COLLECTION_USERS);
         let quotes_collection = db.collection::<QuoteDraft>(COLLECTION_QUOTES);
-        let tokens_collection =
-            db.collection::<VerificationToken>(COLLECTION_VERIFICATION_TOKENS);
+        let tokens_collection = db.collection::<VerificationToken>(COLLECTION_VERIFICATION_TOKENS);
+        let usage_collection = db.collection::<UsageRecord>(COLLECTION_USAGE);
 
         Self::ensure_user_indexes(&users_collection).await?;
         Self::ensure_quote_indexes(&quotes_collection).await?;
+        Self::ensure_usage_indexes(&usage_collection).await?;
 
         Ok(Self {
             pricing_collection,
             users_collection,
             quotes_collection,
             tokens_collection,
+            usage_collection,
         })
     }
 
@@ -75,13 +82,31 @@ impl MongoStore {
         Ok(())
     }
 
-    async fn ensure_quote_indexes(
-        collection: &Collection<QuoteDraft>,
-    ) -> Result<(), StoreError> {
+    async fn ensure_quote_indexes(collection: &Collection<QuoteDraft>) -> Result<(), StoreError> {
         use mongodb::IndexModel;
 
         let index = IndexModel::builder()
             .keys(doc! { "userId": 1, "createdAt": -1 })
+            .build();
+
+        collection
+            .create_index(index)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn ensure_usage_indexes(collection: &Collection<UsageRecord>) -> Result<(), StoreError> {
+        use mongodb::IndexModel;
+
+        let index = IndexModel::builder()
+            .keys(doc! { "userId": 1, "periodStart": 1 })
+            .options(
+                mongodb::options::IndexOptions::builder()
+                    .unique(true)
+                    .build(),
+            )
             .build();
 
         collection
@@ -313,6 +338,69 @@ impl TokenStore for MongoStore {
         let update = doc! { "$set": { "used": true } };
 
         self.tokens_collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl UsageStore for MongoStore {
+    async fn get_or_create_usage(
+        &self,
+        user_id: &UserId,
+        period_start: chrono::DateTime<chrono::Utc>,
+        period_end: chrono::DateTime<chrono::Utc>,
+    ) -> Result<UsageRecord, StoreError> {
+        let filter = doc! {
+            "userId": user_id.as_str(),
+            "periodStart": bson::DateTime::from_millis(period_start.timestamp_millis()),
+        };
+
+        if let Some(record) = self
+            .usage_collection
+            .find_one(filter.clone())
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?
+        {
+            return Ok(record);
+        }
+
+        let record = UsageRecord {
+            user_id: user_id.clone(),
+            period_start,
+            period_end,
+            quote_count: 0,
+        };
+
+        match self.usage_collection.insert_one(&record).await {
+            Ok(_) => Ok(record),
+            Err(e) if e.to_string().contains("E11000") => {
+                // Race condition: another request created it first — just read it
+                self.usage_collection
+                    .find_one(filter)
+                    .await
+                    .map_err(|e| StoreError::Internal(e.to_string()))?
+                    .ok_or_else(|| StoreError::Internal("usage record disappeared".into()))
+            }
+            Err(e) => Err(StoreError::Internal(e.to_string())),
+        }
+    }
+
+    async fn increment_quote_count(
+        &self,
+        user_id: &UserId,
+        period_start: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), StoreError> {
+        let filter = doc! {
+            "userId": user_id.as_str(),
+            "periodStart": bson::DateTime::from_millis(period_start.timestamp_millis()),
+        };
+        let update = doc! { "$inc": { "quoteCount": 1_i32 } };
+
+        self.usage_collection
             .update_one(filter, update)
             .await
             .map_err(|e| StoreError::Internal(e.to_string()))?;

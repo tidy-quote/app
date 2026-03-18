@@ -111,10 +111,7 @@ pub fn validate_save_pricing(req: &SavePricingRequest) -> Result<(), String> {
             ));
         }
         if addon.price < 0.0 || addon.price > MAX_PRICE {
-            return Err(format!(
-                "add-on price must be between 0 and {}",
-                MAX_PRICE
-            ));
+            return Err(format!("add-on price must be between 0 and {}", MAX_PRICE));
         }
     }
     if req.custom_notes.len() > MAX_NOTES_LEN {

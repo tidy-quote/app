@@ -22,8 +22,16 @@ impl EmailSender for SesEmailClient {
     async fn send_email(&self, to: &str, subject: &str, html_body: &str) -> Result<(), EmailError> {
         let dest = Destination::builder().to_addresses(to).build();
 
-        let subject_content = Content::builder().data(subject).charset("UTF-8").build().map_err(|e| EmailError::SendFailed(e.to_string()))?;
-        let body_content = Content::builder().data(html_body).charset("UTF-8").build().map_err(|e| EmailError::SendFailed(e.to_string()))?;
+        let subject_content = Content::builder()
+            .data(subject)
+            .charset("UTF-8")
+            .build()
+            .map_err(|e| EmailError::SendFailed(e.to_string()))?;
+        let body_content = Content::builder()
+            .data(html_body)
+            .charset("UTF-8")
+            .build()
+            .map_err(|e| EmailError::SendFailed(e.to_string()))?;
         let body = Body::builder().html(body_content).build();
         let message = Message::builder()
             .subject(subject_content)

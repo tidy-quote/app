@@ -1,13 +1,21 @@
 use chrono::Utc;
+use tracing::info;
 
-use crate::application::ports::{AiClient, AiError, PricingStore, QuoteStore, StoreError};
+use crate::application::ports::{
+    AiClient, AiError, PricingStore, QuoteStore, StoreError, UsageStore, UserStore,
+};
 use crate::domain::entities::*;
+use crate::domain::quota::{current_billing_period, quota_for_price, QuotaLimit};
 use crate::domain::value_objects::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessLeadError {
     #[error("pricing template not found for user")]
     TemplateNotFound,
+    #[error("quota exceeded: {used}/{limit} quotes used this period")]
+    QuotaExceeded { used: u32, limit: u32 },
+    #[error("user not found")]
+    UserNotFound,
     #[error("store error: {0}")]
     Store(#[from] StoreError),
     #[error("AI error: {0}")]
@@ -18,6 +26,9 @@ pub struct ProcessLeadUseCase<'a> {
     pricing_store: &'a dyn PricingStore,
     ai_client: &'a dyn AiClient,
     quote_store: &'a dyn QuoteStore,
+    usage_store: &'a dyn UsageStore,
+    user_store: &'a dyn UserStore,
+    allowed_price_ids: &'a [String],
 }
 
 impl<'a> ProcessLeadUseCase<'a> {
@@ -25,11 +36,17 @@ impl<'a> ProcessLeadUseCase<'a> {
         pricing_store: &'a dyn PricingStore,
         ai_client: &'a dyn AiClient,
         quote_store: &'a dyn QuoteStore,
+        usage_store: &'a dyn UsageStore,
+        user_store: &'a dyn UserStore,
+        allowed_price_ids: &'a [String],
     ) -> Self {
         Self {
             pricing_store,
             ai_client,
             quote_store,
+            usage_store,
+            user_store,
+            allowed_price_ids,
         }
     }
 
@@ -38,6 +55,8 @@ impl<'a> ProcessLeadUseCase<'a> {
         lead: &Lead,
         tone: ToneOption,
     ) -> Result<QuoteDraft, ProcessLeadError> {
+        self.check_quota(&lead.user_id).await?;
+
         let template = self
             .pricing_store
             .get_template(&lead.user_id)
@@ -77,7 +96,48 @@ impl<'a> ProcessLeadUseCase<'a> {
 
         self.quote_store.save_quote(&quote).await?;
 
+        let (period_start, _) = current_billing_period(Utc::now());
+        self.usage_store
+            .increment_quote_count(&lead.user_id, period_start)
+            .await?;
+
+        info!(
+            event = "quota_incremented",
+            user_id = %lead.user_id,
+        );
+
         Ok(quote)
+    }
+
+    async fn check_quota(&self, user_id: &UserId) -> Result<(), ProcessLeadError> {
+        let user = self
+            .user_store
+            .find_by_id(user_id)
+            .await?
+            .ok_or(ProcessLeadError::UserNotFound)?;
+
+        let price_id = user.subscription_plan.as_deref().unwrap_or("");
+        let limit = quota_for_price(price_id, self.allowed_price_ids);
+
+        let max = match limit {
+            QuotaLimit::Unlimited => return Ok(()),
+            QuotaLimit::Limited(n) => n,
+        };
+
+        let (period_start, period_end) = current_billing_period(Utc::now());
+        let usage = self
+            .usage_store
+            .get_or_create_usage(user_id, period_start, period_end)
+            .await?;
+
+        if usage.quote_count >= max {
+            return Err(ProcessLeadError::QuotaExceeded {
+                used: usage.quote_count,
+                limit: max,
+            });
+        }
+
+        Ok(())
     }
 }
 

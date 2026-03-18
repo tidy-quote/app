@@ -136,25 +136,18 @@ fn parse_event_json(payload: &str) -> Result<StripeEvent, PaymentError> {
     let json: serde_json::Value =
         serde_json::from_str(payload).map_err(|e| PaymentError::ProviderError(e.to_string()))?;
 
-    let event_type = json["type"]
-        .as_str()
-        .unwrap_or_default()
-        .to_string();
+    let event_type = json["type"].as_str().unwrap_or_default().to_string();
 
     let data_object = &json["data"]["object"];
 
-    let customer_id = data_object["customer"]
-        .as_str()
-        .map(|s| s.to_string());
+    let customer_id = data_object["customer"].as_str().map(|s| s.to_string());
 
     let customer_email = data_object["customer_email"]
         .as_str()
         .or_else(|| data_object["customer_details"]["email"].as_str())
         .map(|s| s.to_string());
 
-    let subscription_status = data_object["status"]
-        .as_str()
-        .map(|s| s.to_string());
+    let subscription_status = data_object["status"].as_str().map(|s| s.to_string());
 
     let price_id = data_object["items"]["data"][0]["price"]["id"]
         .as_str()

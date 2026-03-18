@@ -101,12 +101,7 @@ pub async fn handle_stripe_webhook(
                 })?;
 
             user_store
-                .update_subscription(
-                    &user.id,
-                    customer_id,
-                    SubscriptionStatus::Cancelled,
-                    None,
-                )
+                .update_subscription(&user.id, customer_id, SubscriptionStatus::Cancelled, None)
                 .await
                 .map_err(|e| WebhookError::Internal(e.to_string()))?;
 

@@ -24,7 +24,11 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
     let path = req.uri().path().to_string();
     let method = req.method().as_str().to_string();
 
-    info!(method = method.as_str(), path = path.as_str(), event = "request");
+    info!(
+        method = method.as_str(),
+        path = path.as_str(),
+        event = "request"
+    );
 
     let response = match (method.as_str(), path.as_str()) {
         ("OPTIONS", _) => Response::builder()
@@ -81,8 +85,14 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
                 &state.ai_client,
                 &state.store,
                 &state.store,
+                &state.store,
+                &state.allowed_price_ids,
             )
             .await
+        }
+        ("GET", "/api/usage") => {
+            handlers::handle_get_usage(req, &state.store, &state.store, &state.allowed_price_ids)
+                .await
         }
         ("GET", "/api/quotes") => {
             handlers::handle_list_quotes(req, &state.store, &state.store).await
@@ -131,16 +141,13 @@ async fn main() -> Result<(), lambda_http::Error> {
     let ai_model = env::var("AI_MODEL").unwrap_or_else(|_| "openai/gpt-4o-mini".to_string());
     let ses_sender = env::var("SES_SENDER").expect("SES_SENDER must be set");
     let app_base_url = env::var("APP_BASE_URL").expect("APP_BASE_URL must be set");
-    let stripe_secret_key =
-        env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY must be set");
+    let stripe_secret_key = env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY must be set");
     let stripe_webhook_secret =
         env::var("STRIPE_WEBHOOK_SECRET").expect("STRIPE_WEBHOOK_SECRET must be set");
     let stripe_price_starter =
         env::var("STRIPE_PRICE_STARTER").expect("STRIPE_PRICE_STARTER must be set");
-    let stripe_price_solo =
-        env::var("STRIPE_PRICE_SOLO").expect("STRIPE_PRICE_SOLO must be set");
-    let stripe_price_pro =
-        env::var("STRIPE_PRICE_PRO").expect("STRIPE_PRICE_PRO must be set");
+    let stripe_price_solo = env::var("STRIPE_PRICE_SOLO").expect("STRIPE_PRICE_SOLO must be set");
+    let stripe_price_pro = env::var("STRIPE_PRICE_PRO").expect("STRIPE_PRICE_PRO must be set");
 
     let store = MongoStore::new(&mongo_uri)
         .await

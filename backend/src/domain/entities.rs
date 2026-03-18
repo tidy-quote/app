@@ -115,6 +115,15 @@ pub struct PriceLineItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UsageRecord {
+    pub user_id: UserId,
+    pub period_start: DateTime<Utc>,
+    pub period_end: DateTime<Utc>,
+    pub quote_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QuoteDraft {
     pub id: QuoteId,
     pub lead_id: LeadId,

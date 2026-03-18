@@ -122,11 +122,18 @@ mod tests {
 
     #[tokio::test]
     async fn lists_quotes_for_user() {
-        let quotes = vec![make_quote("user-1"), make_quote("user-1"), make_quote("user-2")];
+        let quotes = vec![
+            make_quote("user-1"),
+            make_quote("user-1"),
+            make_quote("user-2"),
+        ];
         let store = MockQuoteStore::new(quotes);
         let use_case = QuoteHistoryUseCase::new(&store);
 
-        let result = use_case.list_quotes(&UserId::new("user-1"), 1, 20).await.unwrap();
+        let result = use_case
+            .list_quotes(&UserId::new("user-1"), 1, 20)
+            .await
+            .unwrap();
 
         assert_eq!(result.len(), 2);
     }
@@ -137,9 +144,18 @@ mod tests {
         let store = MockQuoteStore::new(quotes);
         let use_case = QuoteHistoryUseCase::new(&store);
 
-        let page1 = use_case.list_quotes(&UserId::new("user-1"), 1, 2).await.unwrap();
-        let page2 = use_case.list_quotes(&UserId::new("user-1"), 2, 2).await.unwrap();
-        let page3 = use_case.list_quotes(&UserId::new("user-1"), 3, 2).await.unwrap();
+        let page1 = use_case
+            .list_quotes(&UserId::new("user-1"), 1, 2)
+            .await
+            .unwrap();
+        let page2 = use_case
+            .list_quotes(&UserId::new("user-1"), 2, 2)
+            .await
+            .unwrap();
+        let page3 = use_case
+            .list_quotes(&UserId::new("user-1"), 3, 2)
+            .await
+            .unwrap();
 
         assert_eq!(page1.len(), 2);
         assert_eq!(page2.len(), 2);

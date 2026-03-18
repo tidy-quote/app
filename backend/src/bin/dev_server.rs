@@ -6,16 +6,19 @@ use actix_web::web::{self, Bytes, Data};
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 
 use tidy_quote_backend::application::ports::{
-    EmailSender, PaymentProvider, QuoteStore, TokenStore, UserStore,
+    EmailSender, PaymentProvider, QuoteStore, TokenStore, UsageStore, UserStore,
 };
 use tidy_quote_backend::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
 use tidy_quote_backend::application::use_cases::checkout::{self, CheckoutError};
 use tidy_quote_backend::application::use_cases::email_verification;
 use tidy_quote_backend::application::use_cases::manage_pricing::ManagePricingUseCase;
 use tidy_quote_backend::application::use_cases::password_reset;
-use tidy_quote_backend::application::use_cases::process_lead::ProcessLeadUseCase;
+use tidy_quote_backend::application::use_cases::process_lead::{
+    ProcessLeadError, ProcessLeadUseCase,
+};
 use tidy_quote_backend::application::use_cases::webhook;
 use tidy_quote_backend::domain::entities::*;
+use tidy_quote_backend::domain::quota::{current_billing_period, quota_for_price, QuotaLimit};
 use tidy_quote_backend::domain::value_objects::*;
 use tidy_quote_backend::infrastructure::ai_client::{AiClientConfig, OpenAiCompatibleClient};
 use tidy_quote_backend::infrastructure::mongo_store::MongoStore;
@@ -165,20 +168,15 @@ async fn verify_email(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
     .await
     {
         Ok(()) => HttpResponse::Ok().json(serde_json::json!({"message": "email verified"})),
-        Err(email_verification::EmailVerificationError::InvalidToken) => {
-            HttpResponse::BadRequest()
-                .json(serde_json::json!({"error": "invalid or expired token"}))
-        }
+        Err(email_verification::EmailVerificationError::InvalidToken) => HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "invalid or expired token"})),
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
         }
     }
 }
 
-async fn resend_verification(
-    req: HttpRequest,
-    state: Data<Arc<AppState>>,
-) -> HttpResponse {
+async fn resend_verification(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
     let user_id = match extract_user_id(&req) {
         Ok(id) => id,
         Err(r) => return r,
@@ -266,15 +264,10 @@ async fn reset_password(state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse
         Ok(()) => {
             HttpResponse::Ok().json(serde_json::json!({"message": "password reset successful"}))
         }
-        Err(password_reset::PasswordResetError::InvalidToken) => {
-            HttpResponse::BadRequest()
-                .json(serde_json::json!({"error": "invalid or expired token"}))
-        }
-        Err(password_reset::PasswordResetError::InvalidPassword) => {
-            HttpResponse::BadRequest().json(
-                serde_json::json!({"error": "password must be between 8 and 72 characters"}),
-            )
-        }
+        Err(password_reset::PasswordResetError::InvalidToken) => HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "invalid or expired token"})),
+        Err(password_reset::PasswordResetError::InvalidPassword) => HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "password must be between 8 and 72 characters"})),
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
         }
@@ -410,11 +403,23 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
         created_at: chrono::Utc::now(),
     };
 
-    let use_case =
-        ProcessLeadUseCase::new(&state.store, &state.ai_client, &state.store);
+    let use_case = ProcessLeadUseCase::new(
+        &state.store,
+        &state.ai_client,
+        &state.store,
+        &state.store as &dyn UsageStore,
+        &state.store as &dyn UserStore,
+        &state.allowed_price_ids,
+    );
 
     match use_case.execute(&lead, payload.tone).await {
         Ok(quote) => HttpResponse::Ok().json(quote),
+        Err(ProcessLeadError::QuotaExceeded { used, limit }) => HttpResponse::TooManyRequests()
+            .json(serde_json::json!({
+                "error": "quota_exceeded",
+                "used": used,
+                "limit": limit,
+            })),
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
         }
@@ -450,10 +455,9 @@ async fn list_quotes(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
     }
 
     let query_string = req.query_string();
-    let params: Vec<(String, String)> =
-        url::form_urlencoded::parse(query_string.as_bytes())
-            .into_owned()
-            .collect();
+    let params: Vec<(String, String)> = url::form_urlencoded::parse(query_string.as_bytes())
+        .into_owned()
+        .collect();
 
     let page = params
         .iter()
@@ -509,16 +513,71 @@ async fn get_quote(
 
     match QuoteStore::get_quote(&state.store, &quote_id, &user_id).await {
         Ok(Some(quote)) => HttpResponse::Ok().json(quote),
-        Ok(None) => {
-            HttpResponse::NotFound().json(serde_json::json!({"error": "quote not found"}))
-        }
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({"error": "quote not found"})),
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
         }
     }
 }
 
-async fn create_checkout(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) -> HttpResponse {
+async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    let user = match UserStore::find_by_id(&state.store, &user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "user not found"}))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+    if let Err(r) = check_email_verified_dev(&user) {
+        return r;
+    }
+    if let Err(r) = check_subscription_dev(&user) {
+        return r;
+    }
+
+    let price_id = user.subscription_plan.as_deref().unwrap_or("");
+    let limit = quota_for_price(price_id, &state.allowed_price_ids);
+
+    let now = chrono::Utc::now();
+    let (period_start, period_end) = current_billing_period(now);
+
+    let usage =
+        match UsageStore::get_or_create_usage(&state.store, &user_id, period_start, period_end)
+            .await
+        {
+            Ok(u) => u,
+            Err(e) => {
+                return HttpResponse::InternalServerError()
+                    .json(serde_json::json!({"error": e.to_string()}))
+            }
+        };
+
+    let limit_value = match limit {
+        QuotaLimit::Unlimited => serde_json::Value::Null,
+        QuotaLimit::Limited(n) => serde_json::Value::Number(n.into()),
+    };
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "used": usage.quote_count,
+        "limit": limit_value,
+        "periodEnd": period_end.to_rfc3339(),
+    }))
+}
+
+async fn create_checkout(
+    req: HttpRequest,
+    state: Data<Arc<AppState>>,
+    body: Bytes,
+) -> HttpResponse {
     let user_id = match extract_user_id(&req) {
         Ok(id) => id,
         Err(r) => return r,
@@ -579,10 +638,8 @@ async fn stripe_webhook(req: HttpRequest, state: Data<Arc<AppState>>, body: Byte
     .await
     {
         Ok(()) => HttpResponse::Ok().json(serde_json::json!({"received": true})),
-        Err(webhook::WebhookError::InvalidSignature) => {
-            HttpResponse::BadRequest()
-                .json(serde_json::json!({"error": "invalid webhook signature"}))
-        }
+        Err(webhook::WebhookError::InvalidSignature) => HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "invalid webhook signature"})),
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
         }
@@ -603,16 +660,13 @@ async fn main() -> std::io::Result<()> {
         env::var("AI_MODEL").unwrap_or_else(|_| "google/gemini-3-flash-preview".to_string());
     let ses_sender = env::var("SES_SENDER").expect("SES_SENDER must be set");
     let app_base_url = env::var("APP_BASE_URL").expect("APP_BASE_URL must be set");
-    let stripe_secret_key =
-        env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY must be set");
+    let stripe_secret_key = env::var("STRIPE_SECRET_KEY").expect("STRIPE_SECRET_KEY must be set");
     let stripe_webhook_secret =
         env::var("STRIPE_WEBHOOK_SECRET").expect("STRIPE_WEBHOOK_SECRET must be set");
     let stripe_price_starter =
         env::var("STRIPE_PRICE_STARTER").expect("STRIPE_PRICE_STARTER must be set");
-    let stripe_price_solo =
-        env::var("STRIPE_PRICE_SOLO").expect("STRIPE_PRICE_SOLO must be set");
-    let stripe_price_pro =
-        env::var("STRIPE_PRICE_PRO").expect("STRIPE_PRICE_PRO must be set");
+    let stripe_price_solo = env::var("STRIPE_PRICE_SOLO").expect("STRIPE_PRICE_SOLO must be set");
+    let stripe_price_pro = env::var("STRIPE_PRICE_PRO").expect("STRIPE_PRICE_PRO must be set");
 
     let store = MongoStore::with_database(&mongo_uri, &mongo_db)
         .await
@@ -658,17 +712,12 @@ async fn main() -> std::io::Result<()> {
                 "/api/auth/resend-verification",
                 web::post().to(resend_verification),
             )
-            .route(
-                "/api/auth/forgot-password",
-                web::post().to(forgot_password),
-            )
-            .route(
-                "/api/auth/reset-password",
-                web::post().to(reset_password),
-            )
+            .route("/api/auth/forgot-password", web::post().to(forgot_password))
+            .route("/api/auth/reset-password", web::post().to(reset_password))
             .route("/api/pricing", web::post().to(save_pricing))
             .route("/api/pricing", web::get().to(get_pricing))
             .route("/api/quote", web::post().to(submit_lead))
+            .route("/api/usage", web::get().to(get_usage))
             .route("/api/quotes", web::get().to(list_quotes))
             .route("/api/quotes/{id}", web::get().to(get_quote))
             .route("/api/checkout", web::post().to(create_checkout))

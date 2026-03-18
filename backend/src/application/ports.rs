@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use thiserror::Error;
 
 use crate::domain::entities::*;
@@ -63,7 +64,11 @@ pub trait UserStore: Send + Sync {
     async fn create_user(&self, user: &User) -> Result<(), StoreError>;
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, StoreError>;
     async fn set_email_verified(&self, user_id: &UserId) -> Result<(), StoreError>;
-    async fn update_password(&self, user_id: &UserId, password_hash: &str) -> Result<(), StoreError>;
+    async fn update_password(
+        &self,
+        user_id: &UserId,
+        password_hash: &str,
+    ) -> Result<(), StoreError>;
     async fn find_by_id(&self, user_id: &UserId) -> Result<Option<User>, StoreError>;
     async fn update_subscription(
         &self,
@@ -108,6 +113,22 @@ pub trait QuoteStore: Send + Sync {
         quote_id: &QuoteId,
         user_id: &UserId,
     ) -> Result<Option<QuoteDraft>, StoreError>;
+}
+
+#[async_trait]
+pub trait UsageStore: Send + Sync {
+    async fn get_or_create_usage(
+        &self,
+        user_id: &UserId,
+        period_start: DateTime<Utc>,
+        period_end: DateTime<Utc>,
+    ) -> Result<UsageRecord, StoreError>;
+
+    async fn increment_quote_count(
+        &self,
+        user_id: &UserId,
+        period_start: DateTime<Utc>,
+    ) -> Result<(), StoreError>;
 }
 
 #[async_trait]

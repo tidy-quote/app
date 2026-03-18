@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
 use crate::application::ports::{
-    AiClient, EmailSender, PaymentProvider, PricingStore, QuoteStore, TokenStore, UserStore,
+    AiClient, EmailSender, PaymentProvider, PricingStore, QuoteStore, TokenStore, UsageStore,
+    UserStore,
 };
 use crate::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
 use crate::application::use_cases::checkout::{self, CheckoutError};
@@ -13,6 +14,7 @@ use crate::application::use_cases::password_reset;
 use crate::application::use_cases::process_lead::{ProcessLeadError, ProcessLeadUseCase};
 use crate::application::use_cases::webhook;
 use crate::domain::entities::*;
+use crate::domain::quota::{current_billing_period, quota_for_price, QuotaLimit};
 use crate::domain::value_objects::*;
 use crate::presentation::validation;
 
@@ -362,6 +364,8 @@ pub async fn handle_submit_lead(
     ai_client: &dyn AiClient,
     user_store: &dyn UserStore,
     quote_store: &dyn QuoteStore,
+    usage_store: &dyn UsageStore,
+    allowed_price_ids: &[String],
 ) -> Response<Body> {
     let user_id = match extract_user_id(&req) {
         Ok(id) => id,
@@ -398,7 +402,14 @@ pub async fn handle_submit_lead(
         created_at: chrono::Utc::now(),
     };
 
-    let use_case = ProcessLeadUseCase::new(store, ai_client, quote_store);
+    let use_case = ProcessLeadUseCase::new(
+        store,
+        ai_client,
+        quote_store,
+        usage_store,
+        user_store,
+        allowed_price_ids,
+    );
 
     match use_case.execute(&lead, payload.tone).await {
         Ok(quote) => {
@@ -408,6 +419,14 @@ pub async fn handle_submit_lead(
         Err(ProcessLeadError::TemplateNotFound) => error_response(
             404,
             "pricing template not found — please set up your pricing first",
+        ),
+        Err(ProcessLeadError::QuotaExceeded { used, limit }) => json_response(
+            429,
+            serde_json::json!({
+                "error": "quota_exceeded",
+                "used": used,
+                "limit": limit,
+            }),
         ),
         Err(e) => {
             error!(event = "submit_lead_error", error = %e);
@@ -477,7 +496,10 @@ pub async fn handle_resend_verification(
     )
     .await
     {
-        Ok(()) => json_response(200, serde_json::json!({"message": "verification email sent"})),
+        Ok(()) => json_response(
+            200,
+            serde_json::json!({"message": "verification email sent"}),
+        ),
         Err(e) => {
             error!(event = "resend_verification_error", error = %e);
             error_response(500, "an internal error occurred")
@@ -537,15 +559,13 @@ pub async fn handle_reset_password(
         Err(e) => return error_response(400, &format!("invalid JSON: {}", e)),
     };
 
-    match password_reset::reset_password(
-        &payload.token,
-        &payload.password,
-        user_store,
-        token_store,
-    )
-    .await
+    match password_reset::reset_password(&payload.token, &payload.password, user_store, token_store)
+        .await
     {
-        Ok(()) => json_response(200, serde_json::json!({"message": "password reset successful"})),
+        Ok(()) => json_response(
+            200,
+            serde_json::json!({"message": "password reset successful"}),
+        ),
         Err(password_reset::PasswordResetError::InvalidToken) => {
             error_response(400, "invalid or expired token")
         }
@@ -624,10 +644,9 @@ pub async fn handle_list_quotes(
     }
 
     let query = req.uri().query().unwrap_or("");
-    let params: Vec<(String, String)> =
-        url::form_urlencoded::parse(query.as_bytes())
-            .into_owned()
-            .collect();
+    let params: Vec<(String, String)> = url::form_urlencoded::parse(query.as_bytes())
+        .into_owned()
+        .collect();
 
     let page = params
         .iter()
@@ -687,6 +706,66 @@ pub async fn handle_get_quote(
             error_response(500, "an internal error occurred")
         }
     }
+}
+
+pub async fn handle_get_usage(
+    req: Request,
+    user_store: &dyn UserStore,
+    usage_store: &dyn UsageStore,
+    allowed_price_ids: &[String],
+) -> Response<Body> {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    if let Err(r) = check_email_verified(&user_id, user_store).await {
+        return r;
+    }
+
+    if let Err(r) = check_subscription(&user_id, user_store).await {
+        return r;
+    }
+
+    let user = match user_store.find_by_id(&user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => return error_response(401, "user not found"),
+        Err(e) => {
+            error!(event = "get_usage_error", error = %e);
+            return error_response(500, "an internal error occurred");
+        }
+    };
+
+    let price_id = user.subscription_plan.as_deref().unwrap_or("");
+    let limit = quota_for_price(price_id, allowed_price_ids);
+
+    let now = chrono::Utc::now();
+    let (period_start, period_end) = current_billing_period(now);
+
+    let usage = match usage_store
+        .get_or_create_usage(&user_id, period_start, period_end)
+        .await
+    {
+        Ok(u) => u,
+        Err(e) => {
+            error!(event = "get_usage_error", error = %e);
+            return error_response(500, "an internal error occurred");
+        }
+    };
+
+    let limit_value = match limit {
+        QuotaLimit::Unlimited => serde_json::Value::Null,
+        QuotaLimit::Limited(n) => serde_json::Value::Number(n.into()),
+    };
+
+    json_response(
+        200,
+        serde_json::json!({
+            "used": usage.quote_count,
+            "limit": limit_value,
+            "periodEnd": period_end.to_rfc3339(),
+        }),
+    )
 }
 
 pub async fn handle_stripe_webhook(
