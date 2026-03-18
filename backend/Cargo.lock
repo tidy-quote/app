@@ -3421,6 +3421,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "dotenv",
+ "futures",
  "hex",
  "hmac",
  "jsonwebtoken",
@@ -3436,6 +3437,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid",
 ]
 

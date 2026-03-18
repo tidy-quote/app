@@ -1,6 +1,6 @@
 # ADR-004: Persist and display quote history
 
-**Status**: accepted
+**Status**: in-progress
 **Date**: 2026-03-18
 
 ## Context
@@ -15,13 +15,13 @@ Persist quotes in MongoDB and add a history view.
 
 ### Phase 1: Backend (Rust) — all automated
 
-- [ ] Define `Quote` domain entity: id, user_id, lead_text, job_summary, price_breakdown, follow_up_message, tone, created_at
-- [ ] Add `quotes` collection to `MongoStore` (implements a `QuoteStore` trait)
-- [ ] Create MongoDB index on `(user_id, created_at)` for efficient listing
-- [ ] Save quote in `process_lead` use case after successful generation
-- [ ] `GET /api/quotes` — list quotes for authenticated user (newest first, paginated with `?page=1&limit=20`)
-- [ ] `GET /api/quotes/:id` — fetch single quote for authenticated user
-- [ ] Tests for quote persistence, listing, pagination, ownership check
+- [x] Define `Quote` domain entity: id, user_id, lead_text, job_summary, price_breakdown, follow_up_message, tone, created_at
+- [x] Add `quotes` collection to `MongoStore` (implements a `QuoteStore` trait)
+- [x] Create MongoDB index on `(user_id, created_at)` for efficient listing
+- [x] Save quote in `process_lead` use case after successful generation
+- [x] `GET /api/quotes` — list quotes for authenticated user (newest first, paginated with `?page=1&limit=20`)
+- [x] `GET /api/quotes/:id` — fetch single quote for authenticated user
+- [x] Tests for quote persistence, listing, pagination, ownership check
 
 ### Phase 2: Frontend (React) — all automated
 

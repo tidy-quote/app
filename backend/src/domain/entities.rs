@@ -118,6 +118,8 @@ pub struct PriceLineItem {
 pub struct QuoteDraft {
     pub id: QuoteId,
     pub lead_id: LeadId,
+    #[serde(default)]
+    pub user_id: UserId,
     pub job_summary: JobSummary,
     pub estimated_price: f64,
     pub price_breakdown: Vec<PriceLineItem>,

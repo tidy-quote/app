@@ -21,12 +21,12 @@ struct AppState {
 }
 
 async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, lambda_http::Error> {
-    let path = req.uri().path();
-    let method = req.method().as_str();
+    let path = req.uri().path().to_string();
+    let method = req.method().as_str().to_string();
 
-    info!(method, path, event = "request");
+    info!(method = method.as_str(), path = path.as_str(), event = "request");
 
-    let response = match (method, path) {
+    let response = match (method.as_str(), path.as_str()) {
         ("OPTIONS", _) => Response::builder()
             .status(204)
             .body(Body::Empty)
@@ -75,7 +75,17 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
             handlers::handle_get_pricing(req, &state.store, &state.store).await
         }
         ("POST", "/api/quote") => {
-            handlers::handle_submit_lead(req, &state.store, &state.ai_client, &state.store).await
+            handlers::handle_submit_lead(
+                req,
+                &state.store,
+                &state.ai_client,
+                &state.store,
+                &state.store,
+            )
+            .await
+        }
+        ("GET", "/api/quotes") => {
+            handlers::handle_list_quotes(req, &state.store, &state.store).await
         }
         ("POST", "/api/checkout") => {
             handlers::handle_checkout(
@@ -89,6 +99,10 @@ async fn router(state: Arc<AppState>, req: Request) -> Result<Response<Body>, la
         }
         ("POST", "/api/webhook/stripe") => {
             handlers::handle_stripe_webhook(req, &state.stripe_client, &state.store).await
+        }
+        ("GET", path) if path.starts_with("/api/quotes/") => {
+            let quote_id = &path["/api/quotes/".len()..];
+            handlers::handle_get_quote(req, quote_id, &state.store, &state.store).await
         }
         _ => Response::builder()
             .status(404)

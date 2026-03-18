@@ -1,6 +1,6 @@
 use chrono::Utc;
 
-use crate::application::ports::{AiClient, AiError, PricingStore, StoreError};
+use crate::application::ports::{AiClient, AiError, PricingStore, QuoteStore, StoreError};
 use crate::domain::entities::*;
 use crate::domain::value_objects::*;
 
@@ -17,13 +17,19 @@ pub enum ProcessLeadError {
 pub struct ProcessLeadUseCase<'a> {
     pricing_store: &'a dyn PricingStore,
     ai_client: &'a dyn AiClient,
+    quote_store: &'a dyn QuoteStore,
 }
 
 impl<'a> ProcessLeadUseCase<'a> {
-    pub fn new(pricing_store: &'a dyn PricingStore, ai_client: &'a dyn AiClient) -> Self {
+    pub fn new(
+        pricing_store: &'a dyn PricingStore,
+        ai_client: &'a dyn AiClient,
+        quote_store: &'a dyn QuoteStore,
+    ) -> Self {
         Self {
             pricing_store,
             ai_client,
+            quote_store,
         }
     }
 
@@ -47,6 +53,7 @@ impl<'a> ProcessLeadUseCase<'a> {
         let mut quote = QuoteDraft {
             id: quote_id,
             lead_id: lead.id.clone(),
+            user_id: lead.user_id.clone(),
             job_summary,
             estimated_price,
             price_breakdown,
@@ -67,6 +74,8 @@ impl<'a> ProcessLeadUseCase<'a> {
             quote.clarification_message =
                 Some(build_clarification_message(&quote.job_summary.missing_info));
         }
+
+        self.quote_store.save_quote(&quote).await?;
 
         Ok(quote)
     }

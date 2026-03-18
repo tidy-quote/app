@@ -2,20 +2,24 @@ use async_trait::async_trait;
 use mongodb::bson::{self, doc};
 use mongodb::{Client, Collection, Database};
 
-use crate::application::ports::{PricingStore, StoreError, TokenStore, UserStore};
+use mongodb::options::FindOptions;
+
+use crate::application::ports::{PricingStore, QuoteStore, StoreError, TokenStore, UserStore};
 use crate::domain::entities::{
-    PricingTemplate, SubscriptionStatus, TokenPurpose, User, VerificationToken,
+    PricingTemplate, QuoteDraft, SubscriptionStatus, TokenPurpose, User, VerificationToken,
 };
-use crate::domain::value_objects::UserId;
+use crate::domain::value_objects::{QuoteId, UserId};
 
 const DEFAULT_DB_NAME: &str = "tidy-quote";
 const COLLECTION_PRICING_TEMPLATES: &str = "pricing_templates";
 const COLLECTION_USERS: &str = "users";
+const COLLECTION_QUOTES: &str = "quotes";
 const COLLECTION_VERIFICATION_TOKENS: &str = "verification_tokens";
 
 pub struct MongoStore {
     pricing_collection: Collection<PricingTemplate>,
     users_collection: Collection<User>,
+    quotes_collection: Collection<QuoteDraft>,
     tokens_collection: Collection<VerificationToken>,
 }
 
@@ -36,14 +40,17 @@ impl MongoStore {
     async fn from_database(db: &Database) -> Result<Self, StoreError> {
         let pricing_collection = db.collection::<PricingTemplate>(COLLECTION_PRICING_TEMPLATES);
         let users_collection = db.collection::<User>(COLLECTION_USERS);
+        let quotes_collection = db.collection::<QuoteDraft>(COLLECTION_QUOTES);
         let tokens_collection =
             db.collection::<VerificationToken>(COLLECTION_VERIFICATION_TOKENS);
 
         Self::ensure_user_indexes(&users_collection).await?;
+        Self::ensure_quote_indexes(&quotes_collection).await?;
 
         Ok(Self {
             pricing_collection,
             users_collection,
+            quotes_collection,
             tokens_collection,
         })
     }
@@ -66,6 +73,80 @@ impl MongoStore {
             .map_err(|e| StoreError::Internal(e.to_string()))?;
 
         Ok(())
+    }
+
+    async fn ensure_quote_indexes(
+        collection: &Collection<QuoteDraft>,
+    ) -> Result<(), StoreError> {
+        use mongodb::IndexModel;
+
+        let index = IndexModel::builder()
+            .keys(doc! { "userId": 1, "createdAt": -1 })
+            .build();
+
+        collection
+            .create_index(index)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl QuoteStore for MongoStore {
+    async fn save_quote(&self, quote: &QuoteDraft) -> Result<(), StoreError> {
+        self.quotes_collection
+            .insert_one(quote)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn list_quotes(
+        &self,
+        user_id: &UserId,
+        page: u32,
+        limit: u32,
+    ) -> Result<Vec<QuoteDraft>, StoreError> {
+        use futures::TryStreamExt;
+
+        let filter = doc! { "userId": user_id.as_str() };
+        let skip = (page.saturating_sub(1)) as u64 * limit as u64;
+
+        let options = FindOptions::builder()
+            .sort(doc! { "createdAt": -1 })
+            .skip(skip)
+            .limit(limit as i64)
+            .build();
+
+        let cursor = self
+            .quotes_collection
+            .find(filter)
+            .with_options(options)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        let quotes: Vec<QuoteDraft> = cursor
+            .try_collect()
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(quotes)
+    }
+
+    async fn get_quote(
+        &self,
+        quote_id: &QuoteId,
+        user_id: &UserId,
+    ) -> Result<Option<QuoteDraft>, StoreError> {
+        let filter = doc! { "id": quote_id.as_str(), "userId": user_id.as_str() };
+
+        self.quotes_collection
+            .find_one(filter)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))
     }
 }
 

@@ -5,7 +5,9 @@ use actix_cors::Cors;
 use actix_web::web::{self, Bytes, Data};
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer};
 
-use tidy_quote_backend::application::ports::{EmailSender, PaymentProvider, TokenStore, UserStore};
+use tidy_quote_backend::application::ports::{
+    EmailSender, PaymentProvider, QuoteStore, TokenStore, UserStore,
+};
 use tidy_quote_backend::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
 use tidy_quote_backend::application::use_cases::checkout::{self, CheckoutError};
 use tidy_quote_backend::application::use_cases::email_verification;
@@ -408,10 +410,108 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
         created_at: chrono::Utc::now(),
     };
 
-    let use_case = ProcessLeadUseCase::new(&state.store, &state.ai_client);
+    let use_case =
+        ProcessLeadUseCase::new(&state.store, &state.ai_client, &state.store);
 
     match use_case.execute(&lead, payload.tone).await {
         Ok(quote) => HttpResponse::Ok().json(quote),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+const DEFAULT_PAGE: u32 = 1;
+const DEFAULT_LIMIT: u32 = 20;
+const MAX_LIMIT: u32 = 100;
+
+async fn list_quotes(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    let user = match UserStore::find_by_id(&state.store, &user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "user not found"}))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+    if let Err(r) = check_email_verified_dev(&user) {
+        return r;
+    }
+    if let Err(r) = check_subscription_dev(&user) {
+        return r;
+    }
+
+    let query_string = req.query_string();
+    let params: Vec<(String, String)> =
+        url::form_urlencoded::parse(query_string.as_bytes())
+            .into_owned()
+            .collect();
+
+    let page = params
+        .iter()
+        .find(|(k, _)| k == "page")
+        .and_then(|(_, v)| v.parse::<u32>().ok())
+        .unwrap_or(DEFAULT_PAGE)
+        .max(1);
+
+    let limit = params
+        .iter()
+        .find(|(k, _)| k == "limit")
+        .and_then(|(_, v)| v.parse::<u32>().ok())
+        .unwrap_or(DEFAULT_LIMIT)
+        .clamp(1, MAX_LIMIT);
+
+    match QuoteStore::list_quotes(&state.store, &user_id, page, limit).await {
+        Ok(quotes) => HttpResponse::Ok().json(quotes),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+async fn get_quote(
+    req: HttpRequest,
+    state: Data<Arc<AppState>>,
+    path: web::Path<String>,
+) -> HttpResponse {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    let user = match UserStore::find_by_id(&state.store, &user_id).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json(serde_json::json!({"error": "user not found"}))
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+    if let Err(r) = check_email_verified_dev(&user) {
+        return r;
+    }
+    if let Err(r) = check_subscription_dev(&user) {
+        return r;
+    }
+
+    let quote_id = QuoteId::new(path.into_inner());
+
+    match QuoteStore::get_quote(&state.store, &quote_id, &user_id).await {
+        Ok(Some(quote)) => HttpResponse::Ok().json(quote),
+        Ok(None) => {
+            HttpResponse::NotFound().json(serde_json::json!({"error": "quote not found"}))
+        }
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
         }
@@ -569,6 +669,8 @@ async fn main() -> std::io::Result<()> {
             .route("/api/pricing", web::post().to(save_pricing))
             .route("/api/pricing", web::get().to(get_pricing))
             .route("/api/quote", web::post().to(submit_lead))
+            .route("/api/quotes", web::get().to(list_quotes))
+            .route("/api/quotes/{id}", web::get().to(get_quote))
             .route("/api/checkout", web::post().to(create_checkout))
             .route("/api/webhook/stripe", web::post().to(stripe_webhook))
     })

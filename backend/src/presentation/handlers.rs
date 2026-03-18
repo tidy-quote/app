@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
 use crate::application::ports::{
-    AiClient, EmailSender, PaymentProvider, PricingStore, TokenStore, UserStore,
+    AiClient, EmailSender, PaymentProvider, PricingStore, QuoteStore, TokenStore, UserStore,
 };
 use crate::application::use_cases::auth::{validate_token, AuthError, AuthUseCase};
 use crate::application::use_cases::checkout::{self, CheckoutError};
@@ -361,6 +361,7 @@ pub async fn handle_submit_lead(
     store: &dyn PricingStore,
     ai_client: &dyn AiClient,
     user_store: &dyn UserStore,
+    quote_store: &dyn QuoteStore,
 ) -> Response<Body> {
     let user_id = match extract_user_id(&req) {
         Ok(id) => id,
@@ -397,7 +398,7 @@ pub async fn handle_submit_lead(
         created_at: chrono::Utc::now(),
     };
 
-    let use_case = ProcessLeadUseCase::new(store, ai_client);
+    let use_case = ProcessLeadUseCase::new(store, ai_client, quote_store);
 
     match use_case.execute(&lead, payload.tone).await {
         Ok(quote) => {
@@ -595,6 +596,94 @@ pub async fn handle_checkout(
         Err(CheckoutError::UserNotFound) => error_response(404, "user not found"),
         Err(e) => {
             error!(event = "checkout_error", error = %e);
+            error_response(500, "an internal error occurred")
+        }
+    }
+}
+
+const DEFAULT_PAGE: u32 = 1;
+const DEFAULT_LIMIT: u32 = 20;
+const MAX_LIMIT: u32 = 100;
+
+pub async fn handle_list_quotes(
+    req: Request,
+    quote_store: &dyn QuoteStore,
+    user_store: &dyn UserStore,
+) -> Response<Body> {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    if let Err(r) = check_email_verified(&user_id, user_store).await {
+        return r;
+    }
+
+    if let Err(r) = check_subscription(&user_id, user_store).await {
+        return r;
+    }
+
+    let query = req.uri().query().unwrap_or("");
+    let params: Vec<(String, String)> =
+        url::form_urlencoded::parse(query.as_bytes())
+            .into_owned()
+            .collect();
+
+    let page = params
+        .iter()
+        .find(|(k, _)| k == "page")
+        .and_then(|(_, v)| v.parse::<u32>().ok())
+        .unwrap_or(DEFAULT_PAGE)
+        .max(1);
+
+    let limit = params
+        .iter()
+        .find(|(k, _)| k == "limit")
+        .and_then(|(_, v)| v.parse::<u32>().ok())
+        .unwrap_or(DEFAULT_LIMIT)
+        .clamp(1, MAX_LIMIT);
+
+    match quote_store.list_quotes(&user_id, page, limit).await {
+        Ok(quotes) => {
+            info!(event = "list_quotes", user_id = %user_id, page, count = quotes.len());
+            json_response(200, quotes)
+        }
+        Err(e) => {
+            error!(event = "list_quotes_error", error = %e);
+            error_response(500, "an internal error occurred")
+        }
+    }
+}
+
+pub async fn handle_get_quote(
+    req: Request,
+    quote_id: &str,
+    quote_store: &dyn QuoteStore,
+    user_store: &dyn UserStore,
+) -> Response<Body> {
+    let user_id = match extract_user_id(&req) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+
+    if let Err(r) = check_email_verified(&user_id, user_store).await {
+        return r;
+    }
+
+    if let Err(r) = check_subscription(&user_id, user_store).await {
+        return r;
+    }
+
+    let quote_id = QuoteId::new(quote_id);
+
+    match quote_store.get_quote(&quote_id, &user_id).await {
+        Ok(Some(quote)) => {
+            info!(event = "get_quote", user_id = %user_id, quote_id = %quote_id);
+            json_response(200, quote)
+        }
+        Ok(None) => error_response(404, "quote not found"),
+        Err(e) => {
+            error!(event = "get_quote_error", error = %e);
             error_response(500, "an internal error occurred")
         }
     }

@@ -95,6 +95,22 @@ pub trait EmailSender: Send + Sync {
 }
 
 #[async_trait]
+pub trait QuoteStore: Send + Sync {
+    async fn save_quote(&self, quote: &QuoteDraft) -> Result<(), StoreError>;
+    async fn list_quotes(
+        &self,
+        user_id: &UserId,
+        page: u32,
+        limit: u32,
+    ) -> Result<Vec<QuoteDraft>, StoreError>;
+    async fn get_quote(
+        &self,
+        quote_id: &QuoteId,
+        user_id: &UserId,
+    ) -> Result<Option<QuoteDraft>, StoreError>;
+}
+
+#[async_trait]
 pub trait AiClient: Send + Sync {
     async fn extract_job_details(
         &self,
