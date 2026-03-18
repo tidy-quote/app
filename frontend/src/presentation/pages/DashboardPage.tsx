@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getPricingTemplate, getQuotes } from "../../application/api";
+import { getPricingTemplate, getQuotes, getUsage, type UsageInfo } from "../../application/api";
 import type { QuoteDraft } from "../../domain/types";
 import "./DashboardPage.css";
 
@@ -20,6 +20,7 @@ export function DashboardPage(): React.JSX.Element {
   const [hasPricing, setHasPricing] = useState<boolean | null>(null);
   const [quotes, setQuotes] = useState<QuoteDraft[]>([]);
   const [loadingQuotes, setLoadingQuotes] = useState(true);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
 
   useEffect(() => {
     getPricingTemplate()
@@ -30,7 +31,14 @@ export function DashboardPage(): React.JSX.Element {
       .then(setQuotes)
       .catch(() => setQuotes([]))
       .finally(() => setLoadingQuotes(false));
+
+    getUsage()
+      .then(setUsage)
+      .catch(() => {});
   }, []);
+
+  const quotaExhausted = usage !== null && usage.limit !== null && usage.used >= usage.limit;
+  const quotaWarning = usage !== null && usage.limit !== null && usage.used >= usage.limit * 0.8 && !quotaExhausted;
 
   return (
     <div className="dashboard">
@@ -51,13 +59,48 @@ export function DashboardPage(): React.JSX.Element {
         </div>
       )}
 
+      {usage && (
+        <div className={`usage-bar${quotaWarning ? " usage-bar--warning" : ""}${quotaExhausted ? " usage-bar--exhausted" : ""}`}>
+          <div className="usage-bar__label">
+            <span>
+              {usage.used} / {usage.limit ?? "Unlimited"} quotes this month
+            </span>
+          </div>
+          {usage.limit !== null && (
+            <div className="usage-bar__track">
+              <div
+                className="usage-bar__fill"
+                style={{ width: `${Math.min(100, (usage.used / usage.limit) * 100)}%` }}
+              />
+            </div>
+          )}
+          {quotaExhausted && (
+            <p className="usage-bar__cta">
+              Limit reached.{" "}
+              <Link to="/choose-plan" className="auth-link">
+                Upgrade your plan
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="quick-actions">
-        <Link to="/quote/new" className="action-card action-card--primary">
-          <span className="action-card__title">New Quote</span>
-          <span className="action-card__desc">
-            Paste a lead message or upload photos to generate a quote
-          </span>
-        </Link>
+        {quotaExhausted ? (
+          <div className="action-card action-card--primary action-card--disabled">
+            <span className="action-card__title">New Quote</span>
+            <span className="action-card__desc">
+              Monthly quota reached — upgrade to generate more quotes
+            </span>
+          </div>
+        ) : (
+          <Link to="/quote/new" className="action-card action-card--primary">
+            <span className="action-card__title">New Quote</span>
+            <span className="action-card__desc">
+              Paste a lead message or upload photos to generate a quote
+            </span>
+          </Link>
+        )}
 
         <Link to="/pricing" className="action-card">
           <span className="action-card__title">Pricing Setup</span>

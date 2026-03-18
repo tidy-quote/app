@@ -130,6 +130,19 @@ export async function generateQuote(
   };
 }
 
+export interface UsageInfo {
+  used: number;
+  limit: number | null;
+  periodEnd: string;
+}
+
+export async function getUsage(): Promise<UsageInfo> {
+  if (hasBackend()) {
+    return request<UsageInfo>("/api/usage");
+  }
+  return { used: 0, limit: 5, periodEnd: new Date().toISOString() };
+}
+
 export async function getQuotes(
   page: number = 1,
   limit: number = 20
