@@ -293,7 +293,7 @@ jobs:
       - name: Run smoke tests
         run: npx playwright test --config playwright.smoke.config.ts
         env:
-          DEPLOYED_URL: https://main.djvwq9ny14lwu.amplifyapp.com
+          DEPLOYED_URL: https://app.tidyquote.app
           BASIC_AUTH_USERNAME: ${{ secrets.BASIC_AUTH_USERNAME }}
           BASIC_AUTH_PASSWORD: ${{ secrets.BASIC_AUTH_PASSWORD }}
 

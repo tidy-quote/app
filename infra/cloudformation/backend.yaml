@@ -94,7 +94,7 @@ Resources:
       ProtocolType: HTTP
       CorsConfiguration:
         AllowOrigins:
-          - '*'
+          - 'https://app.tidyquote.app'
         AllowMethods:
           - '*'
         AllowHeaders:
@@ -123,6 +123,28 @@ Resources:
       StageName: '$default'
       AutoDeploy: true
 
+  ApiCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: api.tidyquote.app
+      ValidationMethod: DNS
+
+  ApiDomainName:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: api.tidyquote.app
+      DomainNameConfigurations:
+        - CertificateArn: !Ref ApiCertificate
+          EndpointType: REGIONAL
+
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    DependsOn: HttpApiStage
+    Properties:
+      ApiId: !Ref HttpApi
+      DomainName: !Ref ApiDomainName
+      Stage: '$default'
+
   LambdaApiGatewayPermission:
     Type: 'AWS::Lambda::Permission'
     Properties:
@@ -145,3 +167,7 @@ Outputs:
   LambdaArn:
     Description: Lambda function ARN
     Value: !GetAtt LambdaFunction.Arn
+
+  ApiCustomDomainTarget:
+    Description: CNAME target for api.tidyquote.app in Cloudflare DNS
+    Value: !GetAtt ApiDomainName.RegionalDomainName
