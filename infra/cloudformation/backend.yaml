@@ -40,6 +40,16 @@ Parameters:
     Type: String
     Description: S3 key for Lambda zip package
 
+  SesSender:
+    Type: String
+    Default: noreply@tidyquote.app
+    Description: SES sender email address
+
+  AppBaseUrl:
+    Type: String
+    Default: 'https://app.tidyquote.app'
+    Description: Frontend app base URL (used for email links)
+
 Resources:
   LambdaExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -63,6 +73,12 @@ Resources:
                   - 'logs:CreateLogStream'
                   - 'logs:PutLogEvents'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ses:SendEmail'
+                  - 'ses:SendRawEmail'
+                Resource:
+                  - !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/tidyquote.app'
 
   LambdaFunction:
     Type: 'AWS::Lambda::Function'
@@ -84,6 +100,8 @@ Resources:
           AI_API_KEY: !Ref AiApiKey
           AI_MODEL: !Ref AiModel
           JWT_SECRET: !Ref JwtSecret
+          SES_SENDER: !Ref SesSender
+          APP_BASE_URL: !Ref AppBaseUrl
       Architectures:
         - x86_64
 
@@ -122,6 +140,9 @@ Resources:
       ApiId: !Ref HttpApi
       StageName: '$default'
       AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
 
   ApiCertificate:
     Type: AWS::CertificateManager::Certificate
@@ -144,6 +165,72 @@ Resources:
       ApiId: !Ref HttpApi
       DomainName: !Ref ApiDomainName
       Stage: '$default'
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: tidy-quote-alarms
+
+  AlarmTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: info@tidyquote.app
+
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: tidy-quote-lambda-errors
+      AlarmDescription: Lambda function errors exceed threshold
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref LambdaFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  LambdaDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: tidy-quote-lambda-duration
+      AlarmDescription: Lambda p99 duration approaching timeout
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref LambdaFunction
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 20000
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  Api5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: tidy-quote-api-5xx
+      AlarmDescription: API 5xx responses exceed threshold
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref HttpApi
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
 
   LambdaApiGatewayPermission:
     Type: 'AWS::Lambda::Permission'
