@@ -1,15 +1,35 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getPricingTemplate } from "../../application/api";
+import { getPricingTemplate, getQuotes } from "../../application/api";
+import type { QuoteDraft } from "../../domain/types";
 import "./DashboardPage.css";
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function truncate(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen).trimEnd() + "...";
+}
 
 export function DashboardPage(): React.JSX.Element {
   const [hasPricing, setHasPricing] = useState<boolean | null>(null);
+  const [quotes, setQuotes] = useState<QuoteDraft[]>([]);
+  const [loadingQuotes, setLoadingQuotes] = useState(true);
 
   useEffect(() => {
     getPricingTemplate()
       .then((template) => setHasPricing(template !== null))
       .catch(() => setHasPricing(false));
+
+    getQuotes(1, 5)
+      .then(setQuotes)
+      .catch(() => setQuotes([]))
+      .finally(() => setLoadingQuotes(false));
   }, []);
 
   return (
@@ -48,6 +68,45 @@ export function DashboardPage(): React.JSX.Element {
           </span>
         </Link>
       </div>
+
+      <section className="recent-quotes">
+        <h3 className="recent-quotes__title">Recent Quotes</h3>
+
+        {loadingQuotes && (
+          <div className="recent-quotes__loading">Loading...</div>
+        )}
+
+        {!loadingQuotes && quotes.length === 0 && (
+          <p className="recent-quotes__empty">
+            No quotes yet — create your first one.
+          </p>
+        )}
+
+        {!loadingQuotes && quotes.length > 0 && (
+          <ul className="quote-list">
+            {quotes.map((q) => (
+              <li key={q.id}>
+                <Link to={`/quotes/${q.id}`} className="quote-list__item">
+                  <span className="quote-list__service">
+                    {q.jobSummary.serviceType}
+                  </span>
+                  <span className="quote-list__preview">
+                    {truncate(q.followUpMessage, 60)}
+                  </span>
+                  <span className="quote-list__meta">
+                    <span className="quote-list__price">
+                      ${q.estimatedPrice.toFixed(2)}
+                    </span>
+                    <span className="quote-list__date">
+                      {formatDate(q.createdAt ?? "")}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

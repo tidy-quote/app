@@ -130,6 +130,27 @@ export async function generateQuote(
   };
 }
 
+export async function getQuotes(
+  page: number = 1,
+  limit: number = 20
+): Promise<QuoteDraft[]> {
+  if (hasBackend()) {
+    return request<QuoteDraft[]>(`/api/quotes?page=${page}&limit=${limit}`);
+  }
+  return [];
+}
+
+export async function getQuote(id: string): Promise<QuoteDraft | null> {
+  if (hasBackend()) {
+    try {
+      return await request<QuoteDraft>(`/api/quotes/${id}`);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function createCheckoutSession(
   priceId: string
 ): Promise<string> {

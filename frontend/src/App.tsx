@@ -9,6 +9,7 @@ import { ForgotPasswordPage } from "./presentation/pages/ForgotPasswordPage";
 import { LoginPage } from "./presentation/pages/LoginPage";
 import { NewQuotePage } from "./presentation/pages/NewQuotePage";
 import { PricingSetupPage } from "./presentation/pages/PricingSetupPage";
+import { QuoteDetailPage } from "./presentation/pages/QuoteDetailPage";
 import { ResetPasswordPage } from "./presentation/pages/ResetPasswordPage";
 import { SignupPage } from "./presentation/pages/SignupPage";
 import { VerifyEmailPage } from "./presentation/pages/VerifyEmailPage";
@@ -29,6 +30,7 @@ export function App(): React.JSX.Element {
             <Route element={<AppLayout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/quote/new" element={<NewQuotePage />} />
+              <Route path="/quotes/:id" element={<QuoteDetailPage />} />
               <Route path="/pricing" element={<PricingSetupPage />} />
             </Route>
           </Route>

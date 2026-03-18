@@ -58,6 +58,7 @@ export interface PriceLineItem {
 export interface QuoteDraft {
   id: string;
   leadId: string;
+  userId?: string;
   jobSummary: JobSummary;
   estimatedPrice: number;
   priceBreakdown: PriceLineItem[];
@@ -65,4 +66,5 @@ export interface QuoteDraft {
   followUpMessage: string;
   clarificationMessage?: string;
   tone: ToneOption;
+  createdAt?: string;
 }
