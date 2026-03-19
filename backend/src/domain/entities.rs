@@ -42,6 +42,12 @@ pub struct VerificationToken {
     pub used: bool,
 }
 
+impl VerificationToken {
+    pub fn is_valid(&self) -> bool {
+        !self.used && self.expires_at > Utc::now()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TokenPurpose {
@@ -139,4 +145,44 @@ pub struct QuoteDraft {
     pub clarification_message: Option<String>,
     pub tone: ToneOption,
     pub created_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+
+    fn make_token(expires_at: DateTime<Utc>, used: bool) -> VerificationToken {
+        VerificationToken {
+            user_id: UserId::new("test-user"),
+            token_hash: "abc123".to_string(),
+            purpose: TokenPurpose::EmailVerification,
+            expires_at,
+            used,
+        }
+    }
+
+    #[test]
+    fn valid_unexpired_unused_token() {
+        let token = make_token(Utc::now() + Duration::hours(1), false);
+        assert!(token.is_valid());
+    }
+
+    #[test]
+    fn expired_token_is_invalid() {
+        let token = make_token(Utc::now() - Duration::hours(1), false);
+        assert!(!token.is_valid());
+    }
+
+    #[test]
+    fn used_token_is_invalid() {
+        let token = make_token(Utc::now() + Duration::hours(1), true);
+        assert!(!token.is_valid());
+    }
+
+    #[test]
+    fn expired_and_used_token_is_invalid() {
+        let token = make_token(Utc::now() - Duration::hours(1), true);
+        assert!(!token.is_valid());
+    }
 }

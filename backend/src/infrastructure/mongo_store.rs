@@ -341,13 +341,15 @@ impl TokenStore for MongoStore {
             "token_hash": token_hash,
             "purpose": purpose_bson,
             "used": false,
-            "expires_at": { "$gt": bson::DateTime::now() },
         };
 
-        self.tokens_collection
+        let token = self
+            .tokens_collection
             .find_one(filter)
             .await
-            .map_err(|e| StoreError::Internal(e.to_string()))
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+
+        Ok(token.filter(|t| t.is_valid()))
     }
 
     async fn mark_token_used(&self, token_hash: &str) -> Result<(), StoreError> {
