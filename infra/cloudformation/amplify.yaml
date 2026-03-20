@@ -32,6 +32,10 @@ Resources:
       BranchName: main
       EnableAutoBuild: false
       Stage: PRODUCTION
+      BasicAuthConfig:
+        EnableBasicAuth: false
+        Username: !Ref BasicAuthUsername
+        Password: !Ref BasicAuthPassword
 
 Outputs:
   AppId:
