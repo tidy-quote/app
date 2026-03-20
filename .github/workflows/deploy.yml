@@ -304,6 +304,8 @@ jobs:
           DEPLOYED_URL: https://app.tidyquote.app
           BASIC_AUTH_USERNAME: ${{ secrets.BASIC_AUTH_USERNAME }}
           BASIC_AUTH_PASSWORD: ${{ secrets.BASIC_AUTH_PASSWORD }}
+          SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+          SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
 
       - name: Upload smoke test report
         uses: actions/upload-artifact@v4
