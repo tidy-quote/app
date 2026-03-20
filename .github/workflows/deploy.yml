@@ -132,9 +132,6 @@ jobs:
           aws cloudformation deploy \
             --stack-name ${{ env.FRONTEND_STACK_NAME }} \
             --template-file infra/cloudformation/amplify.yaml \
-            --parameter-overrides \
-              BasicAuthUsername="${{ secrets.BASIC_AUTH_USERNAME }}" \
-              BasicAuthPassword="${{ secrets.BASIC_AUTH_PASSWORD }}" \
             --no-fail-on-empty-changeset
 
       - name: Deploy backend infrastructure
@@ -302,8 +299,6 @@ jobs:
         run: npx playwright test --config playwright.smoke.config.ts
         env:
           DEPLOYED_URL: https://app.tidyquote.app
-          BASIC_AUTH_USERNAME: ${{ secrets.BASIC_AUTH_USERNAME }}
-          BASIC_AUTH_PASSWORD: ${{ secrets.BASIC_AUTH_PASSWORD }}
           SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
           SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
 

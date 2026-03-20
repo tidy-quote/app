@@ -18,10 +18,6 @@ export default defineConfig({
     baseURL: deployedUrl,
     screenshot: "only-on-failure",
     trace: "on-first-retry",
-    httpCredentials: {
-      username: process.env.BASIC_AUTH_USERNAME ?? "",
-      password: process.env.BASIC_AUTH_PASSWORD ?? "",
-    },
   },
   projects: [
     {

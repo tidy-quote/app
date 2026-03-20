@@ -1,18 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Tidy-Quote Amplify Hosting
 
-Parameters:
-  BasicAuthUsername:
-    Type: String
-    Default: admin
-    Description: Username for password protection
-
-  BasicAuthPassword:
-    Type: String
-    NoEcho: true
-    MinLength: 8
-    Description: Password for password protection (min 8 characters)
-
 Resources:
   AmplifyApp:
     Type: AWS::Amplify::App
@@ -32,9 +20,7 @@ Resources:
       EnableAutoBuild: false
       Stage: PRODUCTION
       BasicAuthConfig:
-        EnableBasicAuth: true
-        Username: !Ref BasicAuthUsername
-        Password: !Ref BasicAuthPassword
+        EnableBasicAuth: false
 
 Outputs:
   AppId:
