@@ -1,6 +1,9 @@
 import { useState, useEffect, type FormEvent } from "react";
 import type { ServiceCategory, AddOn, PricingTemplate } from "../../domain/types";
 import { getPricingTemplate, savePricingTemplate } from "../../application/api";
+import { CURRENCIES } from "../../domain/currencies";
+import { COUNTRIES } from "../../domain/countries";
+import { SearchableSelect } from "../components/SearchableSelect";
 import "./PricingSetupPage.css";
 
 const EMPTY_CATEGORY: ServiceCategory = {
@@ -18,7 +21,7 @@ const EMPTY_ADDON: AddOn = {
 
 export function PricingSetupPage(): React.JSX.Element {
   const [currency, setCurrency] = useState("GBP");
-  const [country, setCountry] = useState("UK");
+  const [country, setCountry] = useState("GB");
   const [minimumCallout, setMinimumCallout] = useState(0);
   const [categories, setCategories] = useState<ServiceCategory[]>([
     { ...EMPTY_CATEGORY, id: "1" },
@@ -149,28 +152,20 @@ export function PricingSetupPage(): React.JSX.Element {
           <legend className="section-title">General</legend>
 
           <div className="field-row">
-            <div className="field">
-              <label className="form-label" htmlFor="currency">
-                Currency
-              </label>
-              <input
-                id="currency"
-                className="form-input"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label className="form-label" htmlFor="country">
-                Country
-              </label>
-              <input
-                id="country"
-                className="form-input"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-              />
-            </div>
+            <SearchableSelect
+              id="currency"
+              label="Currency"
+              options={CURRENCIES}
+              value={currency}
+              onChange={setCurrency}
+            />
+            <SearchableSelect
+              id="country"
+              label="Country"
+              options={COUNTRIES}
+              value={country}
+              onChange={setCountry}
+            />
           </div>
 
           <div className="field">
