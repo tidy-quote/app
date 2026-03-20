@@ -1,6 +1,19 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Tidy-Quote Amplify Hosting
 
+Parameters:
+  BasicAuthUsername:
+    Type: String
+    Default: unused
+    Description: Deprecated — basic auth is disabled
+
+  BasicAuthPassword:
+    Type: String
+    Default: unusedxx
+    NoEcho: true
+    MinLength: 8
+    Description: Deprecated — basic auth is disabled
+
 Resources:
   AmplifyApp:
     Type: AWS::Amplify::App
