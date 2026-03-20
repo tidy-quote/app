@@ -6,6 +6,13 @@ import { COUNTRIES } from "../../domain/countries";
 import { SearchableSelect } from "../components/SearchableSelect";
 import "./PricingSetupPage.css";
 
+const MAX_NAME_LEN = 100;
+const MAX_DESCRIPTION_LEN = 500;
+const MAX_NOTES_LEN = 2_000;
+const MAX_PRICE = 99_999;
+const MAX_CATEGORIES = 50;
+const MAX_ADD_ONS = 50;
+
 const EMPTY_CATEGORY: ServiceCategory = {
   id: "",
   name: "",
@@ -19,6 +26,63 @@ const EMPTY_ADDON: AddOn = {
   price: 0,
 };
 
+function validatePricing(
+  categories: ServiceCategory[],
+  addOns: AddOn[],
+  minimumCallout: number,
+  customNotes: string,
+): string | null {
+  if (isNaN(minimumCallout) || minimumCallout < 0 || minimumCallout > MAX_PRICE) {
+    return `Minimum callout must be between 0 and ${MAX_PRICE}.`;
+  }
+
+  if (categories.length === 0) {
+    return "At least one service category is required.";
+  }
+  if (categories.length > MAX_CATEGORIES) {
+    return `At most ${MAX_CATEGORIES} categories allowed.`;
+  }
+
+  for (let i = 0; i < categories.length; i++) {
+    const cat = categories[i];
+    if (cat.name.length === 0) {
+      return `Category ${i + 1} needs a name.`;
+    }
+    if (cat.name.length > MAX_NAME_LEN) {
+      return `Category ${i + 1} name must be at most ${MAX_NAME_LEN} characters.`;
+    }
+    if (cat.description.length > MAX_DESCRIPTION_LEN) {
+      return `Category ${i + 1} description must be at most ${MAX_DESCRIPTION_LEN} characters.`;
+    }
+    if (isNaN(cat.basePrice) || cat.basePrice < 0 || cat.basePrice > MAX_PRICE) {
+      return `Category ${i + 1} price must be between 0 and ${MAX_PRICE}.`;
+    }
+  }
+
+  if (addOns.length > MAX_ADD_ONS) {
+    return `At most ${MAX_ADD_ONS} add-ons allowed.`;
+  }
+
+  for (let i = 0; i < addOns.length; i++) {
+    const addon = addOns[i];
+    if (addon.name.length === 0) {
+      return `Add-on ${i + 1} needs a name.`;
+    }
+    if (addon.name.length > MAX_NAME_LEN) {
+      return `Add-on ${i + 1} name must be at most ${MAX_NAME_LEN} characters.`;
+    }
+    if (isNaN(addon.price) || addon.price < 0 || addon.price > MAX_PRICE) {
+      return `Add-on ${i + 1} price must be between 0 and ${MAX_PRICE}.`;
+    }
+  }
+
+  if (customNotes.length > MAX_NOTES_LEN) {
+    return `Custom notes must be at most ${MAX_NOTES_LEN} characters.`;
+  }
+
+  return null;
+}
+
 export function PricingSetupPage(): React.JSX.Element {
   const [currency, setCurrency] = useState("GBP");
   const [country, setCountry] = useState("GB");
@@ -26,9 +90,7 @@ export function PricingSetupPage(): React.JSX.Element {
   const [categories, setCategories] = useState<ServiceCategory[]>([
     { ...EMPTY_CATEGORY, id: "1" },
   ]);
-  const [addOns, setAddOns] = useState<AddOn[]>([
-    { ...EMPTY_ADDON, id: "1" },
-  ]);
+  const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [customNotes, setCustomNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,9 +156,19 @@ export function PricingSetupPage(): React.JSX.Element {
 
   async function handleSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
-    setSaving(true);
     setSuccessMessage("");
     setErrorMessage("");
+
+    const trimmedCategories = categories.map((c) => ({ ...c, name: c.name.trim() }));
+    const trimmedAddOns = addOns.map((a) => ({ ...a, name: a.name.trim() }));
+
+    const validationError = validatePricing(trimmedCategories, trimmedAddOns, minimumCallout, customNotes);
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    setSaving(true);
 
     const template: PricingTemplate = {
       id: "",
@@ -104,8 +176,8 @@ export function PricingSetupPage(): React.JSX.Element {
       currency,
       country,
       minimumCallout,
-      categories,
-      addOns,
+      categories: trimmedCategories,
+      addOns: trimmedAddOns,
       customNotes,
     };
 
@@ -113,8 +185,9 @@ export function PricingSetupPage(): React.JSX.Element {
       await savePricingTemplate(template);
       setSuccessMessage("Pricing template saved successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch {
-      setErrorMessage("Failed to save. Please try again.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      setErrorMessage(message || "Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -176,6 +249,7 @@ export function PricingSetupPage(): React.JSX.Element {
               id="min-callout"
               type="number"
               min={0}
+              max={MAX_PRICE}
               className="form-input"
               value={minimumCallout}
               onChange={(e) => setMinimumCallout(Number(e.target.value))}
@@ -191,6 +265,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 className="form-input"
                 placeholder="Category name"
                 aria-label={`Category ${i + 1} name`}
+                maxLength={MAX_NAME_LEN}
                 value={cat.name}
                 onChange={(e) => updateCategory(i, "name", e.target.value)}
               />
@@ -198,6 +273,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 className="form-input form-input--short"
                 type="number"
                 min={0}
+                max={MAX_PRICE}
                 placeholder="Price"
                 aria-label={`Category ${i + 1} price`}
                 value={cat.basePrice || ""}
@@ -209,6 +285,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 className="form-input"
                 placeholder="Description"
                 aria-label={`Category ${i + 1} description`}
+                maxLength={MAX_DESCRIPTION_LEN}
                 value={cat.description}
                 onChange={(e) =>
                   updateCategory(i, "description", e.target.value)
@@ -237,6 +314,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 className="form-input"
                 placeholder="Add-on name"
                 aria-label={`Add-on ${i + 1} name`}
+                maxLength={MAX_NAME_LEN}
                 value={addon.name}
                 onChange={(e) => updateAddOn(i, "name", e.target.value)}
               />
@@ -244,6 +322,7 @@ export function PricingSetupPage(): React.JSX.Element {
                 className="form-input form-input--short"
                 type="number"
                 min={0}
+                max={MAX_PRICE}
                 placeholder="Price"
                 aria-label={`Add-on ${i + 1} price`}
                 value={addon.price || ""}
@@ -271,6 +350,7 @@ export function PricingSetupPage(): React.JSX.Element {
           <textarea
             className="form-textarea"
             rows={3}
+            maxLength={MAX_NOTES_LEN}
             placeholder="Any additional notes for quote generation..."
             aria-label="Custom notes"
             value={customNotes}

@@ -34,6 +34,8 @@ test("adds and configures a service category", async ({ page }) => {
 test("adds an add-on", async ({ page }) => {
   await page.goto("/pricing");
 
+  await page.getByRole("button", { name: "+ Add-On" }).click();
+
   const addOnName = page.getByPlaceholder("Add-on name").first();
   const addOnPrice = page
     .locator("fieldset")
@@ -46,6 +48,17 @@ test("adds an add-on", async ({ page }) => {
 
   await expect(addOnName).toHaveValue("Oven Cleaning");
   await expect(addOnPrice).toHaveValue("30");
+});
+
+test("shows error when category name is empty", async ({ page }) => {
+  await page.goto("/pricing");
+
+  // Leave category name empty, fill price
+  await page.getByPlaceholder("Price").first().fill("100");
+
+  await page.getByRole("button", { name: "Save Pricing Template" }).click();
+
+  await expect(page.getByText("Category 1 needs a name.")).toBeVisible();
 });
 
 test("saves pricing template", async ({ page }) => {
