@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import type { ServiceCategory, AddOn, PricingTemplate } from "../../domain/types";
 import { getPricingTemplate, savePricingTemplate } from "../../application/api";
 import { CURRENCIES } from "../../domain/currencies";
@@ -54,8 +54,8 @@ function validatePricing(
     if (cat.description.length > MAX_DESCRIPTION_LEN) {
       return `Category ${i + 1} description must be at most ${MAX_DESCRIPTION_LEN} characters.`;
     }
-    if (isNaN(cat.basePrice) || cat.basePrice < 0 || cat.basePrice > MAX_PRICE) {
-      return `Category ${i + 1} price must be between 0 and ${MAX_PRICE}.`;
+    if (isNaN(cat.basePrice) || cat.basePrice <= 0 || cat.basePrice > MAX_PRICE) {
+      return `Category ${i + 1} needs a price.`;
     }
   }
 
@@ -71,8 +71,8 @@ function validatePricing(
     if (addon.name.length > MAX_NAME_LEN) {
       return `Add-on ${i + 1} name must be at most ${MAX_NAME_LEN} characters.`;
     }
-    if (isNaN(addon.price) || addon.price < 0 || addon.price > MAX_PRICE) {
-      return `Add-on ${i + 1} price must be between 0 and ${MAX_PRICE}.`;
+    if (isNaN(addon.price) || addon.price <= 0 || addon.price > MAX_PRICE) {
+      return `Add-on ${i + 1} needs a price.`;
     }
   }
 
@@ -93,9 +93,13 @@ export function PricingSetupPage(): React.JSX.Element {
   const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [customNotes, setCustomNotes] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [saveStatus, setSaveStatus] = useState<
+    { state: "idle" } |
+    { state: "saving" } |
+    { state: "saved" } |
+    { state: "error"; message: string }
+  >({ state: "idle" });
+  const resetTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     getPricingTemplate()
@@ -156,19 +160,18 @@ export function PricingSetupPage(): React.JSX.Element {
 
   async function handleSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
-    setSuccessMessage("");
-    setErrorMessage("");
+    clearTimeout(resetTimer.current);
 
     const trimmedCategories = categories.map((c) => ({ ...c, name: c.name.trim() }));
     const trimmedAddOns = addOns.map((a) => ({ ...a, name: a.name.trim() }));
 
     const validationError = validatePricing(trimmedCategories, trimmedAddOns, minimumCallout, customNotes);
     if (validationError) {
-      setErrorMessage(validationError);
+      setSaveStatus({ state: "error", message: validationError });
       return;
     }
 
-    setSaving(true);
+    setSaveStatus({ state: "saving" });
 
     const template: PricingTemplate = {
       id: "",
@@ -183,13 +186,11 @@ export function PricingSetupPage(): React.JSX.Element {
 
     try {
       await savePricingTemplate(template);
-      setSuccessMessage("Pricing template saved successfully!");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      setSaveStatus({ state: "saved" });
+      resetTimer.current = setTimeout(() => setSaveStatus({ state: "idle" }), 2500);
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
-      setErrorMessage(message || "Failed to save. Please try again.");
-    } finally {
-      setSaving(false);
+      setSaveStatus({ state: "error", message: message || "Failed to save. Please try again." });
     }
   }
 
@@ -207,18 +208,6 @@ export function PricingSetupPage(): React.JSX.Element {
       <p className="page-desc">
         Configure your service categories, add-ons, and default rates.
       </p>
-
-      {successMessage && (
-        <div className="success-banner" role="status">
-          {successMessage}
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="error-banner" role="alert">
-          {errorMessage}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="pricing-form">
         <fieldset className="form-section">
@@ -272,8 +261,9 @@ export function PricingSetupPage(): React.JSX.Element {
               <input
                 className="form-input form-input--short"
                 type="number"
-                min={0}
+                min={1}
                 max={MAX_PRICE}
+                required
                 placeholder="Price"
                 aria-label={`Category ${i + 1} price`}
                 value={cat.basePrice || ""}
@@ -321,8 +311,9 @@ export function PricingSetupPage(): React.JSX.Element {
               <input
                 className="form-input form-input--short"
                 type="number"
-                min={0}
+                min={1}
                 max={MAX_PRICE}
+                required
                 placeholder="Price"
                 aria-label={`Add-on ${i + 1} price`}
                 value={addon.price || ""}
@@ -358,9 +349,26 @@ export function PricingSetupPage(): React.JSX.Element {
           />
         </fieldset>
 
-        <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? "Saving..." : "Save Pricing Template"}
-        </button>
+        <div className="save-area">
+          <button
+            type="submit"
+            className={`btn-primary save-btn${
+              saveStatus.state === "saving" ? " save-btn--saving" : ""
+            }${saveStatus.state === "saved" ? " save-btn--saved" : ""
+            }${saveStatus.state === "error" ? " save-btn--error" : ""}`}
+            disabled={saveStatus.state === "saving"}
+          >
+            <span className="save-btn__label">
+              {saveStatus.state === "idle" && "Save Pricing Template"}
+              {saveStatus.state === "saving" && "Saving..."}
+              {saveStatus.state === "saved" && "Saved!"}
+              {saveStatus.state === "error" && "Save Pricing Template"}
+            </span>
+          </button>
+          {saveStatus.state === "error" && (
+            <p className="save-error" role="alert">{saveStatus.message}</p>
+          )}
+        </div>
       </form>
     </div>
   );

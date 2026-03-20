@@ -162,26 +162,76 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.success-banner {
-  padding: 0.75rem 1rem;
-  background: var(--color-success-bg);
-  color: var(--color-success-text);
-  border: 1px solid var(--color-success-border);
-  border-radius: 0;
-  font-size: 0.8rem;
-  font-weight: 400;
-  margin-bottom: 1rem;
-  animation: fadeInUp 0.3s ease;
+/* Save button states */
+.save-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.error-banner {
-  padding: 0.75rem 1rem;
-  background: var(--color-error-bg);
-  color: var(--color-error-text);
-  border: 1px solid var(--color-error-border);
-  border-radius: 0;
+.save-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.save-btn__label {
+  display: inline-block;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Saving — subtle pulse */
+.save-btn--saving {
+  opacity: 0.85;
+  animation: savePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes savePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 137, 10, 0.25); }
+  50% { box-shadow: 0 0 0 8px rgba(200, 137, 10, 0); }
+}
+
+/* Saved — teal flash with slide */
+.save-btn--saved {
+  background: var(--cl-teal);
+  border-color: var(--cl-teal);
+  animation: savedFlash 0.4s ease;
+}
+
+.save-btn--saved .save-btn__label {
+  animation: slideIn 0.35s ease;
+}
+
+@keyframes savedFlash {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Error — shake */
+.save-btn--error {
+  animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+.save-error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
-  font-weight: 400;
-  margin-bottom: 1rem;
-  animation: fadeInUp 0.3s ease;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  animation: fadeInUp 0.25s ease;
 }

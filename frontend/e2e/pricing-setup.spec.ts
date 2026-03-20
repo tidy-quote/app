@@ -56,7 +56,9 @@ test("shows error when category name is empty", async ({ page }) => {
   // Leave category name empty, fill price
   await page.getByPlaceholder("Price").first().fill("100");
 
-  await page.getByRole("button", { name: "Save Pricing Template" }).click();
+  const saveBtn = page.getByRole("button", { name: "Save Pricing Template" });
+  await saveBtn.scrollIntoViewIfNeeded();
+  await saveBtn.click();
 
   await expect(page.getByText("Category 1 needs a name.")).toBeVisible();
 });
@@ -68,9 +70,11 @@ test("saves pricing template", async ({ page }) => {
   await page.getByPlaceholder("Price").first().fill("100");
   await page.getByPlaceholder("Description").first().fill("Full deep clean");
 
-  await page.getByRole("button", { name: "Save Pricing Template" }).click();
+  const saveBtn = page.getByRole("button", { name: "Save Pricing Template" });
+  await saveBtn.scrollIntoViewIfNeeded();
+  await saveBtn.click();
 
-  await expect(page.getByText("Pricing template saved successfully!")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible();
 });
 
 test("loads saved pricing template on revisit", async ({ page }) => {
@@ -80,8 +84,10 @@ test("loads saved pricing template on revisit", async ({ page }) => {
   await page.getByPlaceholder("Price").first().fill("50");
   await page.getByPlaceholder("Description").first().fill("Steam carpet clean");
 
-  await page.getByRole("button", { name: "Save Pricing Template" }).click();
-  await expect(page.getByText("Pricing template saved successfully!")).toBeVisible();
+  const saveBtn = page.getByRole("button", { name: "Save Pricing Template" });
+  await saveBtn.scrollIntoViewIfNeeded();
+  await saveBtn.click();
+  await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible();
 
   // Navigate away and come back
   await page.getByRole("link", { name: "Dashboard" }).click();

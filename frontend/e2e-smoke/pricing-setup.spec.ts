@@ -44,7 +44,7 @@ test.describe("Pricing setup", () => {
     await page.getByRole("button", { name: "Save Pricing Template" }).click();
 
     await expect(
-      page.getByText("Pricing template saved successfully!")
+      page.getByRole("button", { name: "Saved!" })
     ).toBeVisible();
   });
 });
