@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSubscriptionStatus } from "../../application/api";
+import { useAuth } from "../components/useAuth";
 import "./AuthPages.css";
 
 const MAX_POLLS = 20;
@@ -8,6 +9,7 @@ const POLL_INTERVAL_MS = 3000;
 
 export function CheckoutSuccessPage(): React.JSX.Element {
   const navigate = useNavigate();
+  const { refreshSubscription } = useAuth();
   const [status, setStatus] = useState<"polling" | "active" | "timeout">("polling");
   const pollCount = useRef(0);
 
@@ -20,6 +22,7 @@ export function CheckoutSuccessPage(): React.JSX.Element {
         if (sub.status === "active") {
           setStatus("active");
           clearInterval(interval);
+          await refreshSubscription();
           setTimeout(() => navigate("/"), 1500);
         }
       } catch {
@@ -33,7 +36,7 @@ export function CheckoutSuccessPage(): React.JSX.Element {
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [navigate]);
+  }, [navigate, refreshSubscription]);
 
   return (
     <div className="auth-page">

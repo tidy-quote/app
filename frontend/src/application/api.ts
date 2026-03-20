@@ -51,9 +51,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     }
 
     const body = await response.json().catch(() => ({}));
-    throw new Error(
-      (body as { error?: string }).error ?? `Request failed: ${response.status}`
-    );
+    const errorMessage = (body as { error?: string }).error;
+
+    if (response.status === 403 && errorMessage === "subscription_required") {
+      window.location.assign("/choose-plan");
+      throw new Error("Subscription required.");
+    }
+
+    throw new Error(errorMessage ?? `Request failed: ${response.status}`);
   }
 
   return response.json() as Promise<T>;

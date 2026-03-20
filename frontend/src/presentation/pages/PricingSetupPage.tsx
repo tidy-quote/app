@@ -30,6 +30,7 @@ export function PricingSetupPage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     getPricingTemplate()
@@ -92,6 +93,7 @@ export function PricingSetupPage(): React.JSX.Element {
     e.preventDefault();
     setSaving(true);
     setSuccessMessage("");
+    setErrorMessage("");
 
     const template: PricingTemplate = {
       id: "",
@@ -109,7 +111,7 @@ export function PricingSetupPage(): React.JSX.Element {
       setSuccessMessage("Pricing template saved successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch {
-      setSuccessMessage("Failed to save. Please try again.");
+      setErrorMessage("Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -133,6 +135,12 @@ export function PricingSetupPage(): React.JSX.Element {
       {successMessage && (
         <div className="success-banner" role="status">
           {successMessage}
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="error-banner" role="alert">
+          {errorMessage}
         </div>
       )}
 

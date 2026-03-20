@@ -32,6 +32,8 @@ export interface PricingTemplate {
   customNotes: string;
 }
 
+export type SubscriptionStatus = "active" | "inactive" | "unknown";
+
 export type ToneOption = "friendly" | "direct" | "premium";
 
 export interface Lead {

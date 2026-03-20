@@ -248,7 +248,7 @@ pub async fn handle_login(
 }
 
 #[allow(clippy::result_large_err)]
-async fn authorize_user(
+async fn authenticate_user(
     user_id: &UserId,
     token_iat: usize,
     user_store: &dyn UserStore,
@@ -257,7 +257,7 @@ async fn authorize_user(
         .find_by_id(user_id)
         .await
         .map_err(|e| {
-            error!(event = "authorize_user_error", error = %e);
+            error!(event = "authenticate_user_error", error = %e);
             error_response(500, "an internal error occurred")
         })?
         .ok_or_else(|| error_response(401, "user not found"))?;
@@ -273,11 +273,15 @@ async fn authorize_user(
         }
     }
 
+    Ok(user)
+}
+
+#[allow(clippy::result_large_err)]
+fn require_subscription(user: &User) -> Result<(), Response<Body>> {
     if user.subscription_status != SubscriptionStatus::Active {
         return Err(error_response(403, "subscription_required"));
     }
-
-    Ok(user)
+    Ok(())
 }
 
 pub async fn handle_save_pricing(
@@ -291,7 +295,7 @@ pub async fn handle_save_pricing(
         Err(r) => return r,
     };
 
-    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+    let _user = match authenticate_user(&user_id, claims.iat, user_store).await {
         Ok(u) => u,
         Err(r) => return r,
     };
@@ -343,7 +347,7 @@ pub async fn handle_get_pricing(
         Err(r) => return r,
     };
 
-    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+    let _user = match authenticate_user(&user_id, claims.iat, user_store).await {
         Ok(u) => u,
         Err(r) => return r,
     };
@@ -376,10 +380,14 @@ pub async fn handle_submit_lead(
         Err(r) => return r,
     };
 
-    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+    let user = match authenticate_user(&user_id, claims.iat, user_store).await {
         Ok(u) => u,
         Err(r) => return r,
     };
+
+    if let Err(r) = require_subscription(&user) {
+        return r;
+    }
 
     let body = match parse_body(&req) {
         Ok(b) => b,
@@ -639,7 +647,7 @@ pub async fn handle_list_quotes(
         Err(r) => return r,
     };
 
-    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+    let _user = match authenticate_user(&user_id, claims.iat, user_store).await {
         Ok(u) => u,
         Err(r) => return r,
     };
@@ -687,7 +695,7 @@ pub async fn handle_get_quote(
         Err(r) => return r,
     };
 
-    let _user = match authorize_user(&user_id, claims.iat, user_store).await {
+    let _user = match authenticate_user(&user_id, claims.iat, user_store).await {
         Ok(u) => u,
         Err(r) => return r,
     };
@@ -719,7 +727,7 @@ pub async fn handle_get_usage(
         Err(r) => return r,
     };
 
-    let user = match authorize_user(&user_id, claims.iat, user_store).await {
+    let user = match authenticate_user(&user_id, claims.iat, user_store).await {
         Ok(u) => u,
         Err(r) => return r,
     };

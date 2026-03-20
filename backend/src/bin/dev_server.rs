@@ -65,12 +65,16 @@ fn extract_user_id(req: &HttpRequest, jwt_secret: &str) -> Result<UserId, HttpRe
     Ok(UserId::new(claims.sub))
 }
 
-fn authorize_user_dev(user: &User) -> Result<(), HttpResponse> {
+fn authenticate_user_dev(user: &User) -> Result<(), HttpResponse> {
     if !user.email_verified {
         return Err(
             HttpResponse::Forbidden().json(serde_json::json!({"error": "email_not_verified"}))
         );
     }
+    Ok(())
+}
+
+fn require_subscription_dev(user: &User) -> Result<(), HttpResponse> {
     if user.subscription_status != SubscriptionStatus::Active {
         return Err(
             HttpResponse::Forbidden().json(serde_json::json!({"error": "subscription_required"}))
@@ -289,7 +293,7 @@ async fn save_pricing(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes)
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = authorize_user_dev(&user) {
+    if let Err(r) = authenticate_user_dev(&user) {
         return r;
     }
 
@@ -338,7 +342,7 @@ async fn get_pricing(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = authorize_user_dev(&user) {
+    if let Err(r) = authenticate_user_dev(&user) {
         return r;
     }
 
@@ -370,7 +374,10 @@ async fn submit_lead(req: HttpRequest, state: Data<Arc<AppState>>, body: Bytes) 
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = authorize_user_dev(&user) {
+    if let Err(r) = authenticate_user_dev(&user) {
+        return r;
+    }
+    if let Err(r) = require_subscription_dev(&user) {
         return r;
     }
 
@@ -433,7 +440,7 @@ async fn list_quotes(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpRespon
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = authorize_user_dev(&user) {
+    if let Err(r) = authenticate_user_dev(&user) {
         return r;
     }
 
@@ -484,7 +491,7 @@ async fn get_quote(
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = authorize_user_dev(&user) {
+    if let Err(r) = authenticate_user_dev(&user) {
         return r;
     }
 
@@ -515,7 +522,7 @@ async fn get_usage(req: HttpRequest, state: Data<Arc<AppState>>) -> HttpResponse
                 .json(serde_json::json!({"error": "an internal error occurred"}))
         }
     };
-    if let Err(r) = authorize_user_dev(&user) {
+    if let Err(r) = authenticate_user_dev(&user) {
         return r;
     }
 

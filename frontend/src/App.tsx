@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./presentation/components/AuthProvider";
 import { ProtectedRoute } from "./presentation/components/ProtectedRoute";
+import { SubscriptionRoute } from "./presentation/components/SubscriptionRoute";
 import { AppLayout } from "./presentation/layouts/AppLayout";
 
 const LoginPage = lazy(() => import("./presentation/pages/LoginPage").then(m => ({ default: m.LoginPage })));
@@ -32,7 +33,9 @@ export function App(): React.JSX.Element {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />
-                <Route path="/quote/new" element={<NewQuotePage />} />
+                <Route element={<SubscriptionRoute />}>
+                  <Route path="/quote/new" element={<NewQuotePage />} />
+                </Route>
                 <Route path="/quotes/:id" element={<QuoteDetailPage />} />
                 <Route path="/pricing" element={<PricingSetupPage />} />
               </Route>
